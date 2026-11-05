@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     retry_max_attempts: int = Field(default=3, ge=1)
     score_threshold: int = Field(default=70, ge=0, le=100)
     max_auto_loops: int = Field(default=2, ge=0)
+    max_idea_length: int = Field(default=2000, ge=1)
     frontend_origin: str = "http://localhost:3000"
     log_level: LogLevel = "INFO"
 

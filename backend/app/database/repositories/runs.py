@@ -32,6 +32,20 @@ async def list_for_campaign(session: AsyncSession, campaign_id: UUID) -> Sequenc
     return result.all()
 
 
+async def get_active(session: AsyncSession, campaign_id: UUID) -> WorkflowRun | None:
+    """Return the newest run that has not reached a terminal status."""
+    result = await session.scalars(
+        select(WorkflowRun)
+        .where(
+            WorkflowRun.campaign_id == campaign_id,
+            WorkflowRun.status.not_in((RunStatus.COMPLETED, RunStatus.FAILED)),
+        )
+        .order_by(WorkflowRun.created_at.desc())
+        .limit(1)
+    )
+    return result.one_or_none()
+
+
 async def set_status(
     session: AsyncSession,
     run_id: UUID,
