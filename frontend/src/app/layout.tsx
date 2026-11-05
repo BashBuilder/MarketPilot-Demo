@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { MockProvider } from "@/mocks/provider";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+
+const mockingEnabled = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -13,7 +16,14 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body>{children}</body>
+      <body>
+        {mockingEnabled ? (
+          <MockProvider>{children}</MockProvider>
+        ) : (
+          children
+        )}
+      </body>
+
     </html>
   );
 }
