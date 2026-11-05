@@ -1,5 +1,7 @@
 """Tests for strict, fail-fast configuration loading."""
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -26,12 +28,16 @@ def test_settings_load_from_environment(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/marketpilot")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     monkeypatch.setenv("COST_CAP_PER_RUN", "3.5")
+    monkeypatch.delenv("ASSET_DIR", raising=False)
+    monkeypatch.delenv("SEARCH_PROVIDER", raising=False)
 
     settings = Settings(_env_file=None)
 
     assert settings.deepseek_api_key.get_secret_value() == "test-key"
     assert settings.database_url.endswith("/marketpilot")
     assert settings.redis_url == "redis://localhost:6379/0"
+    assert settings.asset_dir == Path("assets")
+    assert settings.search_provider == "fake"
     assert settings.cost_cap_per_run == 3.5
     assert settings.image_provider == "fake"
     assert settings.max_image_calls_per_run == 8

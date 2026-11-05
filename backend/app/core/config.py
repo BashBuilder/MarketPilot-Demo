@@ -1,6 +1,7 @@
 """Validated runtime configuration loaded from environment variables."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, SecretStr
@@ -8,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 ImageProvider = Literal["fake", "flux", "sdxl"]
+SearchProviderName = Literal["fake"]
 
 
 class Settings(BaseSettings):
@@ -30,6 +32,8 @@ class Settings(BaseSettings):
     database_url: str
     redis_url: str
     image_provider: ImageProvider = "fake"
+    search_provider: SearchProviderName = "fake"
+    asset_dir: Path = Path("assets")
     cost_cap_per_run: float = Field(default=2.0, gt=0)
     max_image_calls_per_run: int = Field(default=8, ge=0)
     max_search_calls_per_run: int = Field(default=20, ge=0)
