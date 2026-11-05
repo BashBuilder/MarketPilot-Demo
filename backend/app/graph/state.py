@@ -25,6 +25,7 @@ WorkflowStatus = Literal[
     "revising",
     "completed",
     "failed",
+    "escalated",
 ]
 
 
