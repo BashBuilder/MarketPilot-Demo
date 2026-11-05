@@ -22,6 +22,18 @@ const RECONNECT_MAX_MS = 15000;
 
 export type RunStreamStatus = "connecting" | "open" | "reconnecting" | "closed";
 
+/**
+ * Events after which the server ends the stream. Reconnecting would replay a
+ * finished run, so the client closes and stays closed; an unexpected drop is
+ * the only reason to resume.
+ */
+export function isTerminalEvent(event: SseEvent): boolean {
+  if (event.event === "awaiting_approval" || event.event === "completed") {
+    return true;
+  }
+  return event.event === "error" && !event.data.recoverable;
+}
+
 export interface RunStream {
   state: RunState;
   status: RunStreamStatus;
@@ -87,8 +99,19 @@ export function useRunStream(runId: string): RunStream {
     let source: EventSource | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let attempts = 0;
+    let terminal = false;
 
     lastEventIdRef.current = null;
+
+    const closeAsTerminal = (stream: EventSource) => {
+      terminal = true;
+      if (retryTimer !== null) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      stream.close();
+      setStatus("closed");
+    };
 
     const connect = () => {
       if (disposed) return;
@@ -105,7 +128,7 @@ export function useRunStream(runId: string): RunStream {
 
       stream.onerror = () => {
         stream.close();
-        if (disposed) return;
+        if (disposed || terminal) return;
         setStatus("reconnecting");
         const delay = Math.min(
           RECONNECT_BASE_MS * 2 ** attempts,
@@ -127,6 +150,9 @@ export function useRunStream(runId: string): RunStream {
           }
           lastEventIdRef.current = result.event.id;
           setState((previous) => applySseEvent(previous, result.event));
+          if (isTerminalEvent(result.event)) {
+            closeAsTerminal(stream);
+          }
         });
       }
     };

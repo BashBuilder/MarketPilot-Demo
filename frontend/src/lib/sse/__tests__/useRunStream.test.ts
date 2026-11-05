@@ -73,7 +73,9 @@ describe("useRunStream", () => {
       resumed.open();
       for (const event of scripted) resumed.emitEvent(event);
     });
-    expect(result.current.status).toBe("open");
+    // The replay ends at the approval gate, so the resumed stream closes.
+    expect(result.current.status).toBe("closed");
+    expect(resumed.closed).toBe(true);
     expect(result.current.state.lastEventId).toBe("20");
     expect(result.current.state.toolCalls).toHaveLength(4);
     expect(result.current.state.handoffs).toHaveLength(6);
