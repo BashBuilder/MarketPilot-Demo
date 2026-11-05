@@ -9,7 +9,7 @@ export function SiteHeader() {
       <PageContainer className="flex h-16 items-center justify-between gap-sm">
         <Link
           href="/"
-          aria-label="MarketPilot home"
+          aria-label="M MarketPilot home"
           className="inline-flex min-h-10 items-center gap-2xs rounded-md px-2xs text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <span
@@ -17,7 +17,7 @@ export function SiteHeader() {
             className="grid size-7 place-items-center rounded-md bg-primary text-xs font-semibold text-primary-foreground"
           >
             M
-          </span>
+          </span>{" "}
           <span className="hidden text-sm font-semibold tracking-tight sm:inline">
             MarketPilot
           </span>
