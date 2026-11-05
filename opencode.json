@@ -50,13 +50,13 @@
       "*.jpeg": "deny",
       "*.webp": "deny",
       "*.mp4": "deny",
-      "*.safetensors": "deny",
-      "bash": {
-        "*": "allow",
-        "*node_modules*": "deny",
-        "*pnpm-lock.yaml*": "deny",
-        "*uv.lock*": "deny"
-      }
+      "*.safetensors": "deny"
+    },
+    "bash": {
+      "*": "allow",
+      "*node_modules*": "deny",
+      "*pnpm-lock.yaml*": "deny",
+      "*uv.lock*": "deny"
     }
   }
 }
