@@ -14,20 +14,22 @@ import {
 export const haircarePackage: CampaignPackage = {
   brief: haircareBrief,
   research: haircareResearch,
-  copy: haircareCopy,
+  copy: { variants: haircareCopy },
   direction: haircareDirection,
-  assets: haircareAssets,
+  assets: { assets: haircareAssets },
   compliance: haircareCompliance,
   score: haircareScore,
 };
 
 export const revisedPackage: CampaignPackage = {
   ...haircarePackage,
-  copy: haircareCopy.map((variant, index) =>
-    index === 0
-      ? { ...variant, headline: "Shine that lasts past the commute" }
-      : variant,
-  ),
+  copy: {
+    variants: haircareCopy.map((variant, index) =>
+      index === 0
+        ? { ...variant, headline: "Shine that lasts past the commute" }
+        : variant,
+    ),
+  },
   score: {
     ...haircareScore,
     copy_quality: {

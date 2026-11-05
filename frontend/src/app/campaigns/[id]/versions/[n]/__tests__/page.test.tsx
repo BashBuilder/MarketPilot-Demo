@@ -11,11 +11,7 @@ import {
   it,
   vi,
 } from "vitest";
-import {
-  campaignId,
-  haircarePackage,
-  versionOne,
-} from "@/mocks/fixtures";
+import { campaignId, haircarePackage } from "@/mocks/fixtures";
 import { haircareDirection } from "@/mocks/fixtures/package-visuals";
 import { handlers } from "@/mocks/handlers";
 import { resetMockStore } from "@/mocks/store";
@@ -48,7 +44,7 @@ async function renderVersionPage(n = "1") {
 function overrideVersion(packageData: typeof haircarePackage) {
   server.use(
     http.get("*/api/v1/campaigns/:id/versions/:version", () =>
-      HttpResponse.json({ ...versionOne, package: packageData }),
+      HttpResponse.json(packageData),
     ),
   );
 }
@@ -65,7 +61,7 @@ describe("VersionPage", () => {
       screen.getByText(haircarePackage.research.segments[0].name),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(haircarePackage.copy[0].headline),
+      screen.getByText(haircarePackage.copy.variants[0].headline),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("img", { name: haircareDirection.image_prompts[0] }),
@@ -108,7 +104,11 @@ describe("VersionPage", () => {
   it("falls back when an asset image fails to load", async () => {
     overrideVersion({
       ...haircarePackage,
-      assets: [{ ...haircarePackage.assets[0], uri: "/missing-asset.webp" }],
+      assets: {
+        assets: [
+          { ...haircarePackage.assets.assets[0], uri: "/missing-asset.webp" },
+        ],
+      },
     });
 
     await renderVersionPage();

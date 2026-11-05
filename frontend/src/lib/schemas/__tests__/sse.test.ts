@@ -60,6 +60,52 @@ describe("SSE event schema", () => {
     ).toBe(true);
   });
 
+  it("parses the human approval actor and a nullable completed score", () => {
+    expect(
+      sseEvent.safeParse({
+        id: "30",
+        event: "completed",
+        data: {
+          run_id: runId,
+          timestamp: "2026-11-05T09:05:00.000Z",
+          agent: "human",
+          version: 1,
+          score: null,
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      sseEvent.safeParse({
+        id: "31",
+        event: "agent_handoff",
+        data: {
+          run_id: runId,
+          timestamp: "2026-11-05T09:05:00.000Z",
+          agent: "reviewer",
+          from: "reviewer",
+          to: "human",
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("parses a denied tool call", () => {
+    expect(
+      sseEvent.safeParse({
+        id: "32",
+        event: "tool_called",
+        data: {
+          run_id: runId,
+          timestamp: "2026-11-05T09:05:00.000Z",
+          agent: "designer",
+          tool: "generate_image",
+          duration_ms: 0,
+          status: "denied",
+        },
+      }).success,
+    ).toBe(true);
+  });
+
   it("rejects unknown event names", () => {
     expect(
       sseEvent.safeParse({

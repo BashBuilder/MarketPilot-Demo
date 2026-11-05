@@ -9,16 +9,26 @@ interface ToolCallFeedProps {
   className?: string;
 }
 
+const TOOL_STATUS_LABELS: Record<ToolCallRecord["status"], string> = {
+  success: "Success",
+  error: "Error",
+  denied: "Denied",
+};
+
 function ToolStatus({ status }: { status: ToolCallRecord["status"] }) {
   return (
     <span
       className={cn(
         "inline-flex shrink-0 items-center gap-1 text-2xs font-medium",
-        status === "success" ? "text-brand" : "text-destructive",
+        status === "success"
+          ? "text-brand"
+          : status === "denied"
+            ? "text-muted-foreground"
+            : "text-destructive",
       )}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
-      {status === "success" ? "Success" : "Error"}
+      {TOOL_STATUS_LABELS[status]}
     </span>
   );
 }
@@ -67,7 +77,7 @@ export function ToolCallFeed({ calls, className }: ToolCallFeedProps) {
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Status</dt>
-                    <dd>{call.status === "success" ? "Success" : "Error"}</dd>
+                    <dd>{TOOL_STATUS_LABELS[call.status]}</dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Recorded</dt>

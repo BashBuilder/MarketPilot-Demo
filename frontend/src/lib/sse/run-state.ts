@@ -1,7 +1,11 @@
-import type { AgentName } from "@/lib/schemas";
+import type { AgentName, EventActor } from "@/lib/schemas";
 import { agentName } from "@/lib/schemas";
 
 export const AGENT_ORDER: readonly AgentName[] = agentName.options;
+
+export function isAgentName(value: EventActor): value is AgentName {
+  return agentName.safeParse(value).success;
+}
 
 export type AgentStatus = "waiting" | "running" | "retrying" | "failed" | "done";
 
@@ -22,8 +26,8 @@ export interface AgentRunState {
 
 export interface HandoffRecord {
   id: string;
-  from: AgentName;
-  to: AgentName;
+  from: EventActor;
+  to: EventActor;
   timestamp: string;
 }
 
@@ -32,13 +36,13 @@ export interface ToolCallRecord {
   agent: AgentName;
   tool: string;
   durationMs: number;
-  status: "success" | "error";
+  status: "success" | "error" | "denied";
   timestamp: string;
 }
 
 export interface RunErrorRecord {
   id: string;
-  agent: AgentName;
+  agent: EventActor;
   message: string;
   recoverable: boolean;
 }
@@ -51,7 +55,7 @@ export interface MalformedEventRecord {
 export interface RunState {
   runId: string;
   status: RunStatus;
-  currentAgent: AgentName | null;
+  currentAgent: EventActor | null;
   agents: Record<AgentName, AgentRunState>;
   handoffs: readonly HandoffRecord[];
   toolCalls: readonly ToolCallRecord[];

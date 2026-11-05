@@ -1,12 +1,5 @@
 import { z } from "zod";
-import {
-  campaignStatus,
-  isoDateTime,
-  runStatus,
-  text,
-  uuid,
-} from "./common";
-import { campaignPackage } from "./package";
+import { campaignStatus, isoDateTime, text, uuid } from "./common";
 
 export const campaignSummary = z.object({
   id: uuid,
@@ -14,50 +7,38 @@ export const campaignSummary = z.object({
   status: campaignStatus,
   latest_version: z.number().int().positive().nullable(),
   latest_score: z.number().min(0).max(100).nullable(),
+  active_run_id: uuid.nullable(),
   created_at: isoDateTime,
   updated_at: isoDateTime,
 });
 
-export const campaignDetail = campaignSummary.extend({
-  latest_package: campaignPackage.nullable(),
-});
-
 export const campaignList = z.array(campaignSummary);
+
+/** The backend returns the same summary shape from list and detail. */
+export const campaignDetail = campaignSummary;
 
 export const versionSummary = z.object({
   version: z.number().int().positive(),
-  parent_version: z.number().int().positive().nullable(),
+  parent_version_id: uuid.nullable(),
+  score: z.number().min(0).max(100).nullable(),
   created_at: isoDateTime,
-  total_score: z.number().min(0).max(100).nullable(),
-  run_status: runStatus,
 });
 
 export const versionList = z.array(versionSummary);
 
-export const campaignVersion = z.object({
-  campaign_id: uuid,
-  version: z.number().int().positive(),
-  parent_version: z.number().int().positive().nullable(),
-  created_at: isoDateTime,
-  package: campaignPackage,
-  run_id: uuid,
-  run_status: runStatus,
-});
-
 export const diffChange = z.object({
-  field: text,
+  path: text,
   before: z.unknown(),
   after: z.unknown(),
 });
 
 export const versionDiff = z.object({
-  from_version: z.number().int().positive(),
-  to_version: z.number().int().positive(),
+  from: z.number().int().positive(),
+  to: z.number().int().positive(),
   changes: z.array(diffChange),
 });
 
 export type CampaignSummary = z.infer<typeof campaignSummary>;
-export type CampaignDetail = z.infer<typeof campaignDetail>;
+export type CampaignDetail = CampaignSummary;
 export type VersionSummary = z.infer<typeof versionSummary>;
-export type CampaignVersion = z.infer<typeof campaignVersion>;
 export type VersionDiff = z.infer<typeof versionDiff>;

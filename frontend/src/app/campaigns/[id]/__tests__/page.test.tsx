@@ -10,13 +10,8 @@ import {
   expect,
   it,
 } from "vitest";
-import type { CampaignDetail, CampaignVersion } from "@/lib/schemas";
-import {
-  campaignDetail,
-  campaignId,
-  runId,
-  versionOne,
-} from "@/mocks/fixtures";
+import type { CampaignSummary } from "@/lib/schemas";
+import { campaignId, campaignSummary, runId } from "@/mocks/fixtures";
 import { handlers } from "@/mocks/handlers";
 import { resetMockStore } from "@/mocks/store";
 import CampaignPage from "../page";
@@ -28,17 +23,9 @@ afterAll(() => server.close());
 beforeEach(() => resetMockStore());
 afterEach(() => server.resetHandlers());
 
-function overrideCampaign(campaign: CampaignDetail) {
+function overrideCampaign(campaign: CampaignSummary) {
   server.use(
     http.get("*/api/v1/campaigns/:id", () => HttpResponse.json(campaign)),
-  );
-}
-
-function overrideVersion(version: CampaignVersion) {
-  server.use(
-    http.get("*/api/v1/campaigns/:id/versions/:version", () =>
-      HttpResponse.json(version),
-    ),
   );
 }
 
@@ -48,13 +35,12 @@ async function renderCampaignPage() {
 
 describe("CampaignPage", () => {
   it("links to the live run when a run is in progress", async () => {
-    overrideCampaign({ ...campaignDetail, status: "running" });
-    overrideVersion({ ...versionOne, run_status: "running" });
+    overrideCampaign({ ...campaignSummary, status: "running" });
 
     await renderCampaignPage();
 
     expect(
-      screen.getByRole("heading", { level: 1, name: campaignDetail.idea }),
+      screen.getByRole("heading", { level: 1, name: campaignSummary.idea }),
     ).toBeInTheDocument();
 
     const summary = screen.getByRole("region", { name: "Version 1" });

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { CampaignOverview } from "@/components/campaign/CampaignOverview";
 import { EmptyState } from "@/components/states/empty-state";
 import { RetryErrorState } from "@/components/states/retry-error-state";
-import { ApiError, getCampaign, getVersion } from "@/lib/api";
-import type { CampaignDetail, CampaignVersion } from "@/lib/schemas";
+import { ApiError, getCampaign, listVersions } from "@/lib/api";
+import type { CampaignSummary, VersionSummary } from "@/lib/schemas";
 
 export const instant = false;
 
@@ -12,25 +12,22 @@ interface CampaignPageProps {
 }
 
 type LoadResult =
-  | { ok: true; campaign: CampaignDetail; version: CampaignVersion | null }
+  | { ok: true; campaign: CampaignSummary; version: VersionSummary | null }
   | { ok: false; error: unknown };
 
 async function loadCampaign(id: string): Promise<LoadResult> {
   try {
-    const campaign = await getCampaign(id);
+    const [campaign, versions] = await Promise.all([
+      getCampaign(id),
+      listVersions(id),
+    ]);
     if (campaign.latest_version === null) {
       return { ok: true, campaign, version: null };
     }
 
-    try {
-      const version = await getVersion(id, campaign.latest_version);
-      return { ok: true, campaign, version };
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        return { ok: true, campaign, version: null };
-      }
-      throw error;
-    }
+    const version =
+      versions.find((item) => item.version === campaign.latest_version) ?? null;
+    return { ok: true, campaign, version };
   } catch (error) {
     return { ok: false, error };
   }

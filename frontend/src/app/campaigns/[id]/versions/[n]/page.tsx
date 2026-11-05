@@ -8,8 +8,12 @@ import { ScoreBreakdown } from "@/components/score/ScoreBreakdown";
 import { EmptyState } from "@/components/states/empty-state";
 import { ErrorState } from "@/components/states/error-state";
 import { VersionApproval } from "@/components/approval/VersionApproval";
-import { ApiError, getVersion } from "@/lib/api";
-import type { CampaignVersion } from "@/lib/schemas";
+import { ApiError, getCampaign, getVersion, listVersions } from "@/lib/api";
+import type {
+  CampaignPackage,
+  CampaignSummary,
+  VersionSummary,
+} from "@/lib/schemas";
 
 export const instant = false;
 
@@ -41,6 +45,36 @@ function VersionUnavailable() {
   );
 }
 
+type VersionLoadResult =
+  | {
+      ok: true;
+      campaign: CampaignSummary;
+      version: VersionSummary;
+      campaignPackage: CampaignPackage;
+    }
+  | { ok: false; missing: true }
+  | { ok: false; error: unknown };
+
+async function loadVersion(
+  campaignId: string,
+  versionNumber: number,
+): Promise<VersionLoadResult> {
+  try {
+    const [campaign, versions] = await Promise.all([
+      getCampaign(campaignId),
+      listVersions(campaignId),
+    ]);
+    const version = versions.find((item) => item.version === versionNumber);
+    if (!version) {
+      return { ok: false, missing: true };
+    }
+    const campaignPackage = await getVersion(campaignId, versionNumber);
+    return { ok: true, campaign, version, campaignPackage };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
 export default async function VersionPage({ params }: VersionPageProps) {
   const { id, n } = await params;
   const versionNumber = parseVersionParam(n);
@@ -49,11 +83,12 @@ export default async function VersionPage({ params }: VersionPageProps) {
     return <VersionUnavailable />;
   }
 
-  let version: CampaignVersion;
-  try {
-    version = await getVersion(id, versionNumber);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
+  const result = await loadVersion(id, versionNumber);
+  if (!result.ok) {
+    if ("missing" in result) {
+      return <VersionUnavailable />;
+    }
+    if (result.error instanceof ApiError && result.error.status === 404) {
       return <VersionUnavailable />;
     }
 
@@ -62,8 +97,8 @@ export default async function VersionPage({ params }: VersionPageProps) {
         <ErrorState
           title="Could not load this version"
           description={
-            error instanceof ApiError
-              ? error.message
+            result.error instanceof ApiError
+              ? result.error.message
               : "An unexpected error occurred while loading the version."
           }
         />
@@ -71,7 +106,7 @@ export default async function VersionPage({ params }: VersionPageProps) {
     );
   }
 
-  const campaignPackage = version.package;
+  const { campaign, version, campaignPackage } = result;
   const createdOn = version.created_at.slice(0, 10);
 
   return (
@@ -85,18 +120,19 @@ export default async function VersionPage({ params }: VersionPageProps) {
         </h1>
         <p className="text-sm text-muted-foreground">
           Created {createdOn}
-          {version.parent_version
-            ? ` · Revised from version ${version.parent_version}`
-            : null}
+          {version.parent_version_id ? " · Revision" : null}
         </p>
       </header>
 
       <div className="grid gap-lg lg:grid-cols-2">
         <BriefCard brief={campaignPackage.brief} />
         <ResearchCard research={campaignPackage.research} />
-        <CopyCard copy={campaignPackage.copy} className="lg:col-span-2" />
+        <CopyCard
+          copy={campaignPackage.copy.variants}
+          className="lg:col-span-2"
+        />
         <AssetGrid
-          assets={campaignPackage.assets}
+          assets={campaignPackage.assets.assets}
           direction={campaignPackage.direction}
           className="lg:col-span-2"
         />
@@ -107,8 +143,9 @@ export default async function VersionPage({ params }: VersionPageProps) {
       <VersionApproval
         campaignId={id}
         version={version.version}
-        runId={version.run_id}
-        runStatus={version.run_status}
+        runId={campaign.active_run_id}
+        campaignStatus={campaign.status}
+        isLatest={campaign.latest_version === version.version}
       />
     </div>
   );

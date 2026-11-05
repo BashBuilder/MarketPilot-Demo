@@ -7,8 +7,8 @@ const STATUS_META: Record<
   CampaignStatus,
   { label: string; className: string }
 > = {
-  pending: {
-    label: "Pending",
+  draft: {
+    label: "Draft",
     className: "border-border bg-muted text-muted-foreground",
   },
   running: {
@@ -18,14 +18,6 @@ const STATUS_META: Record<
   awaiting_approval: {
     label: "Awaiting approval",
     className: "border-brand/40 bg-brand/10 text-brand",
-  },
-  approved: {
-    label: "Approved",
-    className: "border-border bg-muted text-foreground",
-  },
-  revising: {
-    label: "Revising",
-    className: "border-border bg-muted text-muted-foreground",
   },
   completed: {
     label: "Completed",

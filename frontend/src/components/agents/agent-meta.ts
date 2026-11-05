@@ -1,4 +1,4 @@
-import type { AgentName } from "@/lib/schemas";
+import type { AgentName, EventActor } from "@/lib/schemas";
 
 export interface AgentMeta {
   name: string;
@@ -40,6 +40,11 @@ export const AGENT_META: Record<AgentName, AgentMeta> = {
   },
 };
 
-export function agentLabel(agent: AgentName): string {
-  return AGENT_META[agent].name;
+const HUMAN_META: AgentMeta = {
+  name: "Human review",
+  description: "The approval gate where a person reviews the package.",
+};
+
+export function agentLabel(agent: EventActor): string {
+  return agent === "human" ? HUMAN_META.name : AGENT_META[agent].name;
 }

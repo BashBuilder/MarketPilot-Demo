@@ -20,16 +20,13 @@ export const reviseRunRequest = z.object({
 });
 
 export const approveRunResponse = z.object({
-  run_id: uuid,
-  status: z.literal("approved"),
+  status: z.literal("completed"),
   version: z.number().int().positive(),
 });
 
 export const reviseRunResponse = z.object({
   run_id: uuid,
-  status: z.literal("revision_requested"),
   version: z.number().int().positive(),
-  new_run_id: uuid,
 });
 
 export type CreateCampaignInput = z.infer<typeof createCampaignRequest>;

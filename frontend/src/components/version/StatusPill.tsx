@@ -1,10 +1,14 @@
-import type { WorkflowRunStatus } from "@/lib/schemas";
+import type { CampaignStatus } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
 const STATUS_META: Record<
-  WorkflowRunStatus,
+  CampaignStatus,
   { label: string; className: string }
 > = {
+  draft: {
+    label: "Draft",
+    className: "border-border bg-muted text-muted-foreground",
+  },
   running: {
     label: "Running",
     className: "border-brand/40 bg-brand/10 text-brand",
@@ -13,13 +17,9 @@ const STATUS_META: Record<
     label: "Awaiting approval",
     className: "border-brand/40 bg-brand/10 text-brand",
   },
-  approved: {
-    label: "Approved",
+  completed: {
+    label: "Completed",
     className: "border-border bg-muted text-foreground",
-  },
-  revision_requested: {
-    label: "Revision requested",
-    className: "border-border bg-muted text-muted-foreground",
   },
   failed: {
     label: "Failed",
@@ -28,7 +28,7 @@ const STATUS_META: Record<
 };
 
 interface StatusPillProps {
-  status: WorkflowRunStatus;
+  status: CampaignStatus;
 }
 
 export function StatusPill({ status }: StatusPillProps) {

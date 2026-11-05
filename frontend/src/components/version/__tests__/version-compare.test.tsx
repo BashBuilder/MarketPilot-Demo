@@ -12,7 +12,7 @@ import {
   it,
 } from "vitest";
 import type { VersionDiff, VersionSummary } from "@/lib/schemas";
-import { campaignId } from "@/mocks/fixtures";
+import { campaignId, versionOneId } from "@/mocks/fixtures";
 import { handlers } from "@/mocks/handlers";
 import { resetMockStore } from "@/mocks/store";
 import { VersionCompare } from "../VersionCompare";
@@ -27,17 +27,16 @@ afterEach(() => server.resetHandlers());
 function summary(version: number): VersionSummary {
   return {
     version,
-    parent_version: version > 1 ? version - 1 : null,
+    parent_version_id: version > 1 ? versionOneId : null,
     created_at: `2026-11-0${version}T09:00:00.000Z`,
-    total_score: 80 + version,
-    run_status: "awaiting_approval",
+    score: 80 + version,
   };
 }
 
 function mockDiff(changes: VersionDiff["changes"]) {
   server.use(
     http.get("*/api/v1/campaigns/:id/versions/:from/diff/:to", () =>
-      HttpResponse.json({ from_version: 1, to_version: 2, changes }),
+      HttpResponse.json({ from: 1, to: 2, changes }),
     ),
   );
 }
@@ -55,7 +54,7 @@ describe("VersionCompare", () => {
   it("shows a copy change side by side with a text marker", async () => {
     mockDiff([
       {
-        field: "copy[0].headline",
+        path: "copy.variants.0.headline",
         before: "Shine for a day",
         after: "Shine past the commute",
       },
@@ -65,7 +64,7 @@ describe("VersionCompare", () => {
     expect(
       await screen.findByRole("heading", { name: "Copy" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("copy[0].headline")).toBeInTheDocument();
+    expect(screen.getByText("copy.variants.0.headline")).toBeInTheDocument();
     expect(screen.getByText("Shine for a day")).toBeInTheDocument();
     expect(screen.getByText("Shine past the commute")).toBeInTheDocument();
     expect(screen.getByText("Changed")).toBeInTheDocument();
@@ -76,7 +75,7 @@ describe("VersionCompare", () => {
   it("groups asset changes under Assets", async () => {
     mockDiff([
       {
-        field: "assets[0].uri",
+        path: "assets.assets.0.uri",
         before: "/assets/old.webp",
         after: "/assets/new.webp",
       },

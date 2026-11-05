@@ -20,24 +20,19 @@ export const agentName = z.enum([
 
 export type AgentName = z.infer<typeof agentName>;
 
-/** Status of a single workflow run, as exposed on a version. */
-export const runStatus = z.enum([
-  "running",
-  "awaiting_approval",
-  "approved",
-  "revision_requested",
-  "failed",
-]);
+/**
+ * Event envelopes also identify the human approval gate as `human`; pipeline
+ * agents remain limited to `agentName`.
+ */
+export const eventActor = z.union([agentName, z.literal("human")]);
 
-export type WorkflowRunStatus = z.infer<typeof runStatus>;
+export type EventActor = z.infer<typeof eventActor>;
 
-/** Mirrors the backend `WorkflowState.status` enum. */
+/** Mirrors the backend `CampaignStatus` enum. */
 export const campaignStatus = z.enum([
-  "pending",
+  "draft",
   "running",
   "awaiting_approval",
-  "approved",
-  "revising",
   "completed",
   "failed",
 ]);

@@ -3,11 +3,11 @@ import { ArrowRight } from "lucide-react";
 import { EmptyState } from "@/components/states/empty-state";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusPill } from "@/components/version/StatusPill";
-import type { CampaignDetail, CampaignVersion } from "@/lib/schemas";
+import type { CampaignSummary, VersionSummary } from "@/lib/schemas";
 
 interface CampaignOverviewProps {
-  campaign: CampaignDetail;
-  version: CampaignVersion | null;
+  campaign: CampaignSummary;
+  version: VersionSummary | null;
 }
 
 interface ActiveRunNoticeProps {
@@ -45,10 +45,15 @@ function ActiveRunNotice({ campaignId, runId }: ActiveRunNoticeProps) {
 
 interface LatestVersionProps {
   campaignId: string;
-  version: CampaignVersion;
+  campaignStatus: CampaignSummary["status"];
+  version: VersionSummary;
 }
 
-function LatestVersion({ campaignId, version }: LatestVersionProps) {
+function LatestVersion({
+  campaignId,
+  campaignStatus,
+  version,
+}: LatestVersionProps) {
   return (
     <section
       aria-labelledby="latest-version-heading"
@@ -70,13 +75,14 @@ function LatestVersion({ campaignId, version }: LatestVersionProps) {
             <time dateTime={version.created_at}>
               {version.created_at.slice(0, 10)}
             </time>
+            {version.parent_version_id ? " · Revision" : null}
           </p>
         </div>
 
         <div className="flex flex-col items-end gap-xs">
-          <StatusPill status={version.run_status} />
+          <StatusPill status={campaignStatus} />
           <p className="text-2xl font-semibold tracking-tight">
-            {version.package.score.total} / 100
+            {version.score === null ? "No score" : `${version.score} / 100`}
           </p>
         </div>
       </div>
@@ -103,7 +109,13 @@ export function CampaignOverview({
   campaign,
   version,
 }: CampaignOverviewProps) {
-  const activeRun = version?.run_status === "running" ? version : null;
+  const activeRun =
+    campaign.active_run_id !== null &&
+    campaign.status !== "awaiting_approval" &&
+    campaign.status !== "completed" &&
+    campaign.status !== "failed"
+      ? campaign.active_run_id
+      : null;
 
   return (
     <div className="mx-auto flex w-full max-w-[64rem] flex-col gap-lg">
@@ -123,11 +135,15 @@ export function CampaignOverview({
       </header>
 
       {activeRun ? (
-        <ActiveRunNotice campaignId={campaign.id} runId={activeRun.run_id} />
+        <ActiveRunNotice campaignId={campaign.id} runId={activeRun} />
       ) : null}
 
       {version ? (
-        <LatestVersion campaignId={campaign.id} version={version} />
+        <LatestVersion
+          campaignId={campaign.id}
+          campaignStatus={campaign.status}
+          version={version}
+        />
       ) : (
         <EmptyState
           title="No version yet"

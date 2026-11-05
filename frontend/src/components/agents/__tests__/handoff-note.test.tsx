@@ -20,6 +20,14 @@ describe("HandoffNote", () => {
     );
   });
 
+  it("labels the human approval gate", () => {
+    render(<HandoffNote handoff={{ ...handoff, from: "reviewer", to: "human" }} />);
+
+    expect(screen.getByText("Reviewer").parentElement).toHaveTextContent(
+      "Reviewer handed off to Human review",
+    );
+  });
+
   it("exposes the handoff ids and a machine-readable timestamp", () => {
     const { container } = render(<HandoffNote handoff={handoff} />);
 

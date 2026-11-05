@@ -61,6 +61,18 @@ describe("ToolCallFeed", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a guardrail-denied tool call", () => {
+    render(
+      <ToolCallFeed
+        calls={[{ ...calls[0], id: "denied", status: "denied" }]}
+      />,
+    );
+
+    expect(
+      within(summaryFor("policy_lookup")).getByText("Denied"),
+    ).toBeInTheDocument();
+  });
+
   it("expands a row to show agent, status and recorded time", async () => {
     const user = userEvent.setup();
     render(<ToolCallFeed calls={calls} />);

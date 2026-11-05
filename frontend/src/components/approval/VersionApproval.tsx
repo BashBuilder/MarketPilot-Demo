@@ -4,13 +4,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ApprovalPanel } from "@/components/approval/ApprovalPanel";
 import { ApiError, approveRun, reviseRun } from "@/lib/api";
-import type { AgentName, WorkflowRunStatus } from "@/lib/schemas";
+import type { AgentName, CampaignStatus } from "@/lib/schemas";
 
 interface VersionApprovalProps {
   campaignId: string;
   version: number;
-  runId: string;
-  runStatus: WorkflowRunStatus;
+  runId: string | null;
+  campaignStatus: CampaignStatus;
+  isLatest: boolean;
 }
 
 function errorMessage(error: unknown): string {
@@ -23,14 +24,18 @@ export function VersionApproval({
   campaignId,
   version,
   runId,
-  runStatus,
+  campaignStatus,
+  isLatest,
 }: VersionApprovalProps) {
   const router = useRouter();
-  const [approved, setApproved] = useState(runStatus === "approved");
+  const [approved, setApproved] = useState(
+    isLatest && campaignStatus === "completed",
+  );
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleApprove(comment?: string) {
+    if (runId === null) return;
     setIsPending(true);
     setError(null);
     try {
@@ -45,6 +50,7 @@ export function VersionApproval({
   }
 
   async function handleRevise(comment: string, targetNode?: AgentName) {
+    if (runId === null) return;
     setIsPending(true);
     setError(null);
     try {
@@ -53,7 +59,7 @@ export function VersionApproval({
         target_node: targetNode,
       });
       // Stay pending while the new run page loads, so the action cannot repeat.
-      router.push(`/campaigns/${campaignId}/run/${result.new_run_id}`);
+      router.push(`/campaigns/${campaignId}/run/${result.run_id}`);
     } catch (caught) {
       setError(errorMessage(caught));
       setIsPending(false);
@@ -81,7 +87,9 @@ export function VersionApproval({
     );
   }
 
-  if (runStatus !== "awaiting_approval") {
+  const canReview =
+    isLatest && campaignStatus === "awaiting_approval" && runId !== null;
+  if (!canReview) {
     return null;
   }
 

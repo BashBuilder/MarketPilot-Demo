@@ -11,12 +11,12 @@ export const campaignBrief = z.object({
 });
 
 export const audienceSegment = z.object({
-  name: text,
-  description: text,
+  name: z.string().min(2),
+  description: z.string().min(5),
 });
 
 export const researchSource = z.object({
-  title: text,
+  title: z.string().min(1).max(300),
   // Only http(s) links may become anchors in the UI; this blocks javascript:
   // and other executable URL schemes from backend data.
   url: z
@@ -33,15 +33,20 @@ export const audienceResearch = z.object({
 });
 
 export const copyVariant = z.object({
-  channel: text,
-  headline: text,
-  description: text,
-  cta: text,
+  channel: z.string().min(2),
+  headline: z.string().min(5),
+  description: z.string().min(10),
+  cta: z.string().min(2),
+});
+
+/** The backend groups copy in an `AdCopySet` object, not a bare array. */
+export const adCopySet = z.object({
+  variants: z.array(copyVariant).min(1),
 });
 
 export const creativeDirection = z.object({
-  style_guide: text,
-  composition: text,
+  style_guide: z.string().min(5),
+  composition: z.string().min(5),
   image_prompts: z.array(text).min(1),
   video_prompts: z.array(text).min(1),
   negative_prompts: z.array(text).min(1),
@@ -53,15 +58,20 @@ export const asset = z.object({
     .min(5)
     .regex(/^\S+$/, "must not contain whitespace"),
   checksum: z.string().regex(/^[0-9a-fA-F]{64}$/, "must be 64 hex characters"),
-  model: text,
+  model: z.string().min(2),
   seed: z.number().int().nonnegative(),
-  prompt: text,
+  prompt: z.string().min(5),
+});
+
+/** The backend groups generated files in an `AssetSet` object. */
+export const assetSet = z.object({
+  assets: z.array(asset).min(1),
 });
 
 export const complianceItem = z.object({
-  check: text,
+  check: z.string().min(3),
   passed: z.boolean(),
-  reason: text,
+  reason: z.string().min(5),
 });
 
 export const complianceReport = z.object({
@@ -98,9 +108,9 @@ export const creativeScore = z.object({
 export const campaignPackage = z.object({
   brief: campaignBrief,
   research: audienceResearch,
-  copy: z.array(copyVariant).min(1),
+  copy: adCopySet,
   direction: creativeDirection,
-  assets: z.array(asset).min(1),
+  assets: assetSet,
   compliance: complianceReport,
   score: creativeScore,
 });
@@ -109,8 +119,10 @@ export type CampaignBrief = z.infer<typeof campaignBrief>;
 export type ResearchSource = z.infer<typeof researchSource>;
 export type AudienceResearch = z.infer<typeof audienceResearch>;
 export type CopyVariant = z.infer<typeof copyVariant>;
+export type AdCopySet = z.infer<typeof adCopySet>;
 export type CreativeDirection = z.infer<typeof creativeDirection>;
 export type Asset = z.infer<typeof asset>;
+export type AssetSet = z.infer<typeof assetSet>;
 export type ComplianceReport = z.infer<typeof complianceReport>;
 export type CreativeScore = z.infer<typeof creativeScore>;
 export type CampaignPackage = z.infer<typeof campaignPackage>;

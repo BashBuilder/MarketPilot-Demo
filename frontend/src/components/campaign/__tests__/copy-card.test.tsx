@@ -6,7 +6,7 @@ import { CopyCard } from "../CopyCard";
 
 describe("CopyCard", () => {
   it("renders every variant from the package fixture grouped by channel", () => {
-    const { copy } = haircarePackage;
+    const copy = haircarePackage.copy.variants;
 
     render(<CopyCard copy={copy} />);
 
@@ -75,7 +75,7 @@ describe("CopyCard", () => {
 
     render(
       <CopyCard
-        copy={[{ ...haircarePackage.copy[0], headline }]}
+        copy={[{ ...haircarePackage.copy.variants[0], headline }]}
       />,
     );
 

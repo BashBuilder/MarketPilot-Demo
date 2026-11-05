@@ -1,7 +1,6 @@
 import type {
-  CampaignDetail,
+  CampaignPackage,
   CampaignSummary,
-  CampaignVersion,
   SseEvent,
   VersionDiff,
   VersionSummary,
@@ -12,13 +11,24 @@ import {
   campaignSummary,
   runId,
   versionOne,
+  versionOneId,
+  versionSummaryOne,
 } from "./fixtures";
 
 export type MockRunStatus =
+  | "pending"
   | "running"
   | "awaiting_approval"
-  | "approved"
-  | "revision_requested";
+  | "completed"
+  | "failed";
+
+export interface MockVersion {
+  id: string;
+  summary: VersionSummary;
+  package: CampaignPackage;
+  /** Local metadata for routing mock approvals; never returned by the API. */
+  run_id: string;
+}
 
 export interface MockRun {
   id: string;
@@ -39,7 +49,7 @@ function diffKey(campaign: string, from: number, to: number): string {
 
 export class MockApiStore {
   campaigns = new Map<string, CampaignSummary>();
-  versions = new Map<string, CampaignVersion[]>();
+  versions = new Map<string, MockVersion[]>();
   diffs = new Map<string, VersionDiff>();
   runs = new Map<string, MockRun>();
 
@@ -49,7 +59,19 @@ export class MockApiStore {
 
   reset(): void {
     this.campaigns = new Map([[campaignId, { ...campaignSummary }]]);
-    this.versions = new Map([[campaignId, [versionOne]]]);
+    this.versions = new Map([
+      [
+        campaignId,
+        [
+          {
+            id: versionOneId,
+            summary: { ...versionSummaryOne },
+            package: versionOne,
+            run_id: runId,
+          },
+        ],
+      ],
+    ]);
     this.diffs = new Map();
     this.runs = new Map([
       [
@@ -68,28 +90,19 @@ export class MockApiStore {
     return Array.from(this.campaigns.values());
   }
 
-  getCampaign(id: string): CampaignDetail | undefined {
-    const summary = this.campaigns.get(id);
-    if (!summary) return undefined;
-    const versions = this.versions.get(id) ?? [];
-    return {
-      ...summary,
-      latest_package: versions.at(-1)?.package ?? null,
-    };
+  getCampaign(id: string): CampaignSummary | undefined {
+    return this.campaigns.get(id);
   }
 
   listVersions(id: string): VersionSummary[] {
-    return (this.versions.get(id) ?? []).map((version) => ({
-      version: version.version,
-      parent_version: version.parent_version,
-      created_at: version.created_at,
-      total_score: version.package.score.total,
-      run_status: version.run_status,
-    }));
+    return (this.versions.get(id) ?? []).map((version) => version.summary);
   }
 
-  getVersion(id: string, version: number): CampaignVersion | undefined {
-    return this.versions.get(id)?.find((item) => item.version === version);
+  getVersion(id: string, version: number): CampaignPackage | undefined {
+    return this.versions
+      .get(id)
+      ?.find((item) => item.summary.version === version)
+      ?.package;
   }
 
   getDiff(id: string, from: number, to: number): VersionDiff | undefined {
@@ -125,7 +138,8 @@ export class MockApiStore {
       idea,
       status: "awaiting_approval",
       latest_version: 1,
-      latest_score: versionOne.package.score.total,
+      latest_score: versionOne.score.total,
+      active_run_id: run_id,
       created_at: now,
       updated_at: now,
     };
@@ -133,11 +147,15 @@ export class MockApiStore {
     this.campaigns.set(campaign_id, summary);
     this.versions.set(campaign_id, [
       {
-        ...versionOne,
-        campaign_id,
-        created_at: now,
+        id: crypto.randomUUID(),
+        summary: {
+          version: 1,
+          parent_version_id: null,
+          created_at: now,
+          score: versionOne.score.total,
+        },
+        package: versionOne,
         run_id,
-        run_status: "awaiting_approval",
       },
     ]);
     this.runs.set(run_id, {

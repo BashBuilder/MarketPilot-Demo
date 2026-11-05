@@ -48,23 +48,23 @@ const invalidCases: Array<[string, ZodType, unknown]> = [
     researchSource,
     { title: "Unsafe source", url: "javascript:alert(1)" },
   ],
-  ["copy variant", copyVariant, { ...haircarePackage.copy[0], cta: "" }],
+  ["copy variant", copyVariant, { ...haircarePackage.copy.variants[0], cta: "" }],
   ["direction", creativeDirection, { ...haircarePackage.direction, image_prompts: [] }],
   [
     "direction without negative prompts",
     creativeDirection,
     { ...haircarePackage.direction, negative_prompts: [] },
   ],
-  ["asset", asset, { ...haircarePackage.assets[0], seed: 1.5 }],
+  ["asset", asset, { ...haircarePackage.assets.assets[0], seed: 1.5 }],
   [
     "asset with a non-hex checksum",
     asset,
-    { ...haircarePackage.assets[0], checksum: "not-a-checksum" },
+    { ...haircarePackage.assets.assets[0], checksum: "not-a-checksum" },
   ],
   [
     "asset with a whitespace uri",
     asset,
-    { ...haircarePackage.assets[0], uri: "/mock assets/aurelia.webp" },
+    { ...haircarePackage.assets.assets[0], uri: "/mock assets/aurelia.webp" },
   ],
   [
     "compliance item with a non-boolean outcome",
@@ -108,12 +108,33 @@ describe("campaign package schemas", () => {
     expect(complianceReport.safeParse(compliance).success).toBe(true);
   });
 
-  it("rejects a package with an empty copy or asset list", () => {
+  it("rejects empty copy or asset sets", () => {
     expect(
-      campaignPackage.safeParse({ ...haircarePackage, copy: [] }).success,
+      campaignPackage.safeParse({
+        ...haircarePackage,
+        copy: { variants: [] },
+      }).success,
     ).toBe(false);
     expect(
-      campaignPackage.safeParse({ ...haircarePackage, assets: [] }).success,
+      campaignPackage.safeParse({
+        ...haircarePackage,
+        assets: { assets: [] },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects the old bare-array copy and asset shapes", () => {
+    expect(
+      campaignPackage.safeParse({
+        ...haircarePackage,
+        copy: haircarePackage.copy.variants,
+      }).success,
+    ).toBe(false);
+    expect(
+      campaignPackage.safeParse({
+        ...haircarePackage,
+        assets: haircarePackage.assets.assets,
+      }).success,
     ).toBe(false);
   });
 

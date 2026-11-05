@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { agentName, isoDateTime, text, uuid } from "./common";
+import { eventActor, isoDateTime, text, uuid } from "./common";
 
 const eventBase = z.object({
   run_id: uuid,
   timestamp: isoDateTime,
-  agent: agentName,
+  agent: eventActor,
 });
 
 export const agentStartedEvent = z.object({
@@ -17,8 +17,8 @@ export const agentHandoffEvent = z.object({
   id: text,
   event: z.literal("agent_handoff"),
   data: eventBase.extend({
-    from: agentName,
-    to: agentName,
+    from: eventActor,
+    to: eventActor,
   }),
 });
 
@@ -28,7 +28,7 @@ export const toolCalledEvent = z.object({
   data: eventBase.extend({
     tool: text,
     duration_ms: z.number().int().nonnegative(),
-    status: z.enum(["success", "error"]),
+    status: z.enum(["success", "error", "denied"]),
   }),
 });
 
@@ -62,7 +62,7 @@ export const completedEvent = z.object({
   event: z.literal("completed"),
   data: eventBase.extend({
     version: z.number().int().positive(),
-    score: z.number().min(0).max(100),
+    score: z.number().min(0).max(100).nullable(),
   }),
 });
 

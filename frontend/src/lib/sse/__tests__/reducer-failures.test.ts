@@ -57,6 +57,42 @@ describe("terminal events", () => {
     expect(state.score).toBe(86);
   });
 
+  it("handles the human approval actor without inventing an agent", () => {
+    const state = applySseEvent(replay(scripted.slice(0, 19)), {
+      id: "20",
+      event: "awaiting_approval",
+      data: {
+        run_id: runId,
+        timestamp: at,
+        agent: "human",
+        version: 1,
+      },
+    });
+
+    expect(state.status).toBe("awaiting_approval");
+    expect(state.currentAgent).toBe("human");
+    expect(state.version).toBe(1);
+    expect(state.agents.reviewer.status).toBe("running");
+  });
+
+  it("captures a completed event from the human actor", () => {
+    const state = applySseEvent(replay(), {
+      id: "21",
+      event: "completed",
+      data: {
+        run_id: runId,
+        timestamp: at,
+        agent: "human",
+        version: 1,
+        score: null,
+      },
+    });
+
+    expect(state.status).toBe("completed");
+    expect(state.currentAgent).toBe("human");
+    expect(state.score).toBeNull();
+  });
+
   it("fails the run on a non-recoverable error", () => {
     const state = applySseEvent(replay(scripted.slice(0, 1)), {
       id: "22",

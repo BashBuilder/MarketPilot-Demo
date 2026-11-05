@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type { VersionSummary } from "@/lib/schemas";
-import { StatusPill } from "./StatusPill";
 
 export interface VersionListProps {
   campaignId: string;
@@ -30,19 +29,16 @@ export function VersionList({ campaignId, versions }: VersionListProps) {
                 <time dateTime={version.created_at}>
                   {version.created_at.slice(0, 10)}
                 </time>
-                {version.parent_version
-                  ? ` · Revised from version ${version.parent_version}`
-                  : null}
+                {version.parent_version_id ? " · Revision" : null}
               </p>
             </div>
 
             <div className="flex shrink-0 items-center gap-sm">
               <div className="flex flex-col items-end gap-1">
-                <StatusPill status={version.run_status} />
                 <p className="text-xs text-muted-foreground">
-                  {version.total_score === null
+                  {version.score === null
                     ? "No score"
-                    : `${version.total_score} / 100`}
+                    : `${version.score} / 100`}
                 </p>
               </div>
               <ChevronRight

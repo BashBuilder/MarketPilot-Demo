@@ -52,35 +52,29 @@ describe("run schemas", () => {
     ).toBe(false);
   });
 
-  it("accepts the approve response shape", () => {
-    const response = {
-      run_id: "0f8fad5b-d9cb-469f-a165-70867728950e",
-      status: "approved",
-      version: 1,
-    };
-    expect(approveRunResponse.safeParse(response).success).toBe(true);
+  it("accepts the backend approval response", () => {
     expect(
-      approveRunResponse.safeParse({
-        ...response,
-        status: "revision_requested",
-      }).success,
+      approveRunResponse.safeParse({ status: "completed", version: 1 }).success,
+    ).toBe(true);
+    expect(
+      approveRunResponse.safeParse({ status: "approved", version: 1 }).success,
     ).toBe(false);
+    expect(approveRunResponse.safeParse({ status: "completed" }).success).toBe(
+      false,
+    );
   });
 
-  it("requires a new run id on a revision response", () => {
+  it("accepts the backend revision response", () => {
     const response = {
       run_id: "0f8fad5b-d9cb-469f-a165-70867728950e",
-      status: "revision_requested",
       version: 2,
-      new_run_id: "5f2c1d3a-8b6e-4f0a-9c7d-2e1b3a4c5d6e",
     };
     expect(reviseRunResponse.safeParse(response).success).toBe(true);
     expect(
-      reviseRunResponse.safeParse({ ...response, new_run_id: undefined })
-        .success,
+      reviseRunResponse.safeParse({ ...response, run_id: undefined }).success,
     ).toBe(false);
     expect(
-      reviseRunResponse.safeParse({ ...response, status: "approved" }).success,
+      reviseRunResponse.safeParse({ ...response, version: 0 }).success,
     ).toBe(false);
   });
 });

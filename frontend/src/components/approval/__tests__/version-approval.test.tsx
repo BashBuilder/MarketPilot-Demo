@@ -13,7 +13,7 @@ import {
   vi,
 } from "vitest";
 import { VersionApproval } from "../VersionApproval";
-import type { WorkflowRunStatus } from "@/lib/schemas";
+import type { CampaignStatus } from "@/lib/schemas";
 import { handlers } from "@/mocks/handlers";
 import { campaignId, runId } from "@/mocks/fixtures";
 import { mockStore, resetMockStore } from "@/mocks/store";
@@ -38,13 +38,17 @@ beforeEach(() => {
 });
 afterEach(() => server.resetHandlers());
 
-function renderApproval(runStatus: WorkflowRunStatus = "awaiting_approval") {
+function renderApproval(
+  campaignStatus: CampaignStatus = "awaiting_approval",
+  isLatest = true,
+) {
   return render(
     <VersionApproval
       campaignId={campaignId}
       version={1}
       runId={runId}
-      runStatus={runStatus}
+      campaignStatus={campaignStatus}
+      isLatest={isLatest}
     />,
   );
 }
@@ -61,7 +65,7 @@ describe("VersionApproval", () => {
       "Version 1 approved",
     );
     await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
-    expect(mockStore.campaigns.get(campaignId)?.status).toBe("approved");
+    expect(mockStore.campaigns.get(campaignId)?.status).toBe("completed");
     expect(
       screen.queryByRole("button", { name: "Request revision" }),
     ).not.toBeInTheDocument();
@@ -122,8 +126,7 @@ describe("VersionApproval", () => {
       http.post("*/api/v1/runs/:runId/approve", () => {
         requests += 1;
         return HttpResponse.json({
-          run_id: runId,
-          status: "approved",
+          status: "completed",
           version: 1,
         });
       }),
@@ -139,12 +142,17 @@ describe("VersionApproval", () => {
     await waitFor(() => expect(requests).toBe(1));
   });
 
-  it("only shows the panel while the run is awaiting approval", () => {
+  it("only shows the panel while the campaign is awaiting approval", () => {
     const { unmount } = renderApproval("running");
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     unmount();
 
-    renderApproval("approved");
+    renderApproval("completed");
     expect(screen.getByRole("status")).toHaveTextContent("Version 1 approved");
+  });
+
+  it("does not offer approval for an older version", () => {
+    renderApproval("awaiting_approval", false);
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
   });
 });

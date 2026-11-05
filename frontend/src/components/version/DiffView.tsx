@@ -35,7 +35,7 @@ function sectionRank(key: string): number {
 function groupChanges(changes: readonly DiffChange[]) {
   const groups = new Map<string, DiffChange[]>();
   for (const change of changes) {
-    const key = sectionKey(change.field);
+    const key = sectionKey(change.path);
     const group = groups.get(key);
     if (group) {
       group.push(change);
@@ -91,13 +91,13 @@ export function DiffView({ diff }: DiffViewProps) {
           <ol className="mt-sm flex flex-col gap-sm">
             {changes.map((change) => (
               <li
-                key={change.field}
+                key={change.path}
                 data-changed="true"
                 className="rounded-lg border border-border border-l-2 border-l-brand bg-card p-md"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2xs">
                   <code className="text-xs break-all text-muted-foreground">
-                    {change.field}
+                    {change.path}
                   </code>
                   <span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-2xs font-medium text-brand">
                     Changed

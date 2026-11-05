@@ -5,7 +5,7 @@ import { haircarePackage } from "@/mocks/fixtures";
 import { haircareDirection } from "@/mocks/fixtures/package-visuals";
 import { AssetGrid } from "../AssetGrid";
 
-const { assets } = haircarePackage;
+const assets = haircarePackage.assets.assets;
 const firstAlt = haircareDirection.image_prompts[0];
 
 describe("AssetGrid", () => {

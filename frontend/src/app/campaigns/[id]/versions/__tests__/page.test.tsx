@@ -11,7 +11,7 @@ import {
   it,
 } from "vitest";
 import type { VersionSummary } from "@/lib/schemas";
-import { campaignId } from "@/mocks/fixtures";
+import { campaignId, versionOneId } from "@/mocks/fixtures";
 import { handlers } from "@/mocks/handlers";
 import { resetMockStore } from "@/mocks/store";
 import LoadingVersionsPage from "../loading";
@@ -40,28 +40,25 @@ async function renderVersionsPage() {
 }
 
 describe("VersionsPage", () => {
-  it("lists versions newest first with date, score, status and detail links", async () => {
+  it("lists versions newest first with date, score and detail links", async () => {
     overrideVersions([
       {
         version: 1,
-        parent_version: null,
+        parent_version_id: null,
         created_at: "2026-11-03T09:00:00.000Z",
-        total_score: 86,
-        run_status: "approved",
+        score: 86,
       },
       {
         version: 3,
-        parent_version: 2,
+        parent_version_id: versionOneId,
         created_at: "2026-11-05T09:00:00.000Z",
-        total_score: 91,
-        run_status: "awaiting_approval",
+        score: 91,
       },
       {
         version: 2,
-        parent_version: 1,
+        parent_version_id: versionOneId,
         created_at: "2026-11-04T09:00:00.000Z",
-        total_score: null,
-        run_status: "revision_requested",
+        score: null,
       },
     ]);
 
@@ -82,14 +79,12 @@ describe("VersionsPage", () => {
     }
 
     expect(within(newest).getByText("Version 3")).toBeInTheDocument();
-    expect(within(newest).getByText("2026-11-05")).toBeInTheDocument();
+    expect(within(newest).getByText(/2026-11-05/)).toBeInTheDocument();
     expect(within(newest).getByText("91 / 100")).toBeInTheDocument();
-    expect(within(newest).getByText("Awaiting approval")).toBeInTheDocument();
+    expect(within(newest).getByText(/Revision/)).toBeInTheDocument();
     expect(within(middle).getByText("No score")).toBeInTheDocument();
-    expect(
-      within(middle).getByText("Revision requested"),
-    ).toBeInTheDocument();
-    expect(within(oldest).getByText("Approved")).toBeInTheDocument();
+    expect(within(oldest).getByText(/2026-11-03/)).toBeInTheDocument();
+    expect(within(oldest).queryByText(/Revision/)).not.toBeInTheDocument();
   });
 
   it("shows an empty state when the campaign has no versions", async () => {
