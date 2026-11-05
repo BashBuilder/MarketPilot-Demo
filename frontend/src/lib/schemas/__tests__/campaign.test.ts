@@ -36,9 +36,29 @@ describe("campaign schemas", () => {
     expect(versionDiff.safeParse(revisionDiff).success).toBe(true);
   });
 
+  it("accepts every backend workflow status", () => {
+    for (const status of [
+      "pending",
+      "running",
+      "awaiting_approval",
+      "approved",
+      "revising",
+      "completed",
+      "failed",
+    ]) {
+      expect(
+        campaignSummary.safeParse({ ...campaignSummaryFixture, status }).success,
+      ).toBe(true);
+    }
+  });
+
   it("rejects an unknown campaign status", () => {
     expect(
       campaignSummary.safeParse({ ...campaignSummaryFixture, status: "paused" })
+        .success,
+    ).toBe(false);
+    expect(
+      campaignSummary.safeParse({ ...campaignSummaryFixture, status: "draft" })
         .success,
     ).toBe(false);
   });

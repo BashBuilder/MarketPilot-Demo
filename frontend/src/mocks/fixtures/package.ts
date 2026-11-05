@@ -30,17 +30,11 @@ export const revisedPackage: CampaignPackage = {
   ),
   score: {
     ...haircareScore,
-    dimensions: haircareScore.dimensions.map((dimension) =>
-      dimension.dimension === "copy_quality"
-        ? {
-            ...dimension,
-            score: 9,
-            justification:
-              "The revised hook is more distinctive while staying within the claims policy.",
-          }
-        : dimension,
-    ),
+    copy_quality: {
+      score: 9,
+      justification:
+        "The revised hook is more distinctive while staying within the claims policy.",
+    },
     total: 91,
-    recommendation: "Ready for human approval.",
   },
 };

@@ -17,33 +17,27 @@ export const haircareBrief: CampaignBrief = {
 };
 
 export const haircareResearch: AudienceResearch = {
-  summary:
-    "The audience wants visible shine without a long routine. They distrust miracle claims and respond to specific, achievable outcomes.",
   segments: [
     {
       name: "Busy professionals",
       description: "Time-poor commuters who style their hair most weekdays.",
-      pain_points: [
-        "Frizz returns by mid-afternoon",
-        "Styling takes longer than they want",
-      ],
-      messaging_angles: [
-        "Three-minute routine",
-        "Shine that survives the commute",
-      ],
     },
     {
       name: "Colour maintainers",
       description: "Adults refreshing colour every six to eight weeks.",
-      pain_points: [
-        "Colour fades faster than expected",
-        "Hair feels dry after cleansing",
-      ],
-      messaging_angles: [
-        "Colour-kind cleansing",
-        "Softness after the first wash",
-      ],
     },
+  ],
+  pain_points: [
+    "Frizz returns by mid-afternoon",
+    "Styling takes longer than they want",
+    "Colour fades faster than expected",
+    "Hair feels dry after cleansing",
+  ],
+  messaging_angles: [
+    "Three-minute routine",
+    "Shine that survives the commute",
+    "Colour-kind cleansing",
+    "Softness after the first wash",
   ],
 };
 

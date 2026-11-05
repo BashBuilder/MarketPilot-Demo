@@ -72,7 +72,7 @@ export const revisionDiff: VersionDiff = {
       after: revisedPackage.copy[0].headline,
     },
     {
-      field: "score.dimensions[copy_quality].score",
+      field: "score.copy_quality.score",
       before: 8,
       after: 9,
     },

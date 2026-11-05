@@ -20,11 +20,14 @@ export const agentName = z.enum([
 
 export type AgentName = z.infer<typeof agentName>;
 
+/** Mirrors the backend `WorkflowState.status` enum. */
 export const campaignStatus = z.enum([
-  "draft",
+  "pending",
   "running",
   "awaiting_approval",
   "approved",
+  "revising",
+  "completed",
   "failed",
 ]);
 
