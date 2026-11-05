@@ -102,6 +102,8 @@ describe("AgentTimeline", () => {
     expect(badge).toHaveClass("motion-safe:animate-in");
     expect(badge).toHaveClass("motion-safe:fade-in-0");
     expect(badge).not.toHaveClass("animate-in");
+    expect(row).toHaveClass("motion-safe:transition-colors");
+    expect(row).not.toHaveClass("transition-colors");
     expect(row).toHaveAttribute("data-status", "running");
   });
 });

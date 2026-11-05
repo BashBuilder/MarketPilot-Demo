@@ -29,7 +29,7 @@ export function AgentTimeline({ agents, className }: AgentTimelineProps) {
             key={agent}
             data-agent={agent}
             data-status={state.status}
-            className="flex items-center justify-between gap-sm px-md py-sm transition-colors"
+            className="flex items-center justify-between gap-sm px-md py-sm motion-safe:transition-colors"
           >
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">{copy.name}</p>

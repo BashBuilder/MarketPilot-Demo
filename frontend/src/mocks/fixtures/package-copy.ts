@@ -39,6 +39,16 @@ export const haircareResearch: AudienceResearch = {
     "Colour-kind cleansing",
     "Softness after the first wash",
   ],
+  sources: [
+    {
+      title: "Hair care routines and styling habits",
+      url: "https://example.com/research/hair-care-routines",
+    },
+    {
+      title: "Colour maintenance consumer guide",
+      url: "https://example.com/research/colour-maintenance",
+    },
+  ],
 };
 
 export const haircareCopy: CopyVariant[] = [

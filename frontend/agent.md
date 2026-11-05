@@ -96,7 +96,7 @@ Base path `/api/v1`, configured through `NEXT_PUBLIC_API_URL`. All bodies are JS
 
 Clients reconnect with `Last-Event-ID` and resume.
 
-**Package shape (per version):** `brief`, `research`, `copy` (variants per channel), `direction`, `assets` (uri, checksum, model, seed, prompt), `compliance` (items with pass/fail and reason), `score` (per-dimension scores, justifications, total).
+**Package shape (per version):** `brief`, `research` (segments, pain points, messaging angles, `sources` as `{ title, url }`), `copy` (variants per channel), `direction`, `assets` (uri, checksum, model, seed, prompt), `compliance` (items with pass/fail and reason), `score` (per-dimension scores, justifications, total).
 
 **Errors:** `{ error: { code, message, details? } }` with the matching HTTP status.
 

@@ -11,6 +11,7 @@ import {
   copyVariant,
   creativeDirection,
   creativeScore,
+  researchSource,
   scoreDimension,
 } from "@/lib/schemas";
 import { haircarePackage } from "@/mocks/fixtures";
@@ -26,7 +27,26 @@ const invalidCases: Array<[string, ZodType, unknown]> = [
   [
     "research without top-level pain points",
     audienceResearch,
-    { segments: haircarePackage.research.segments, messaging_angles: ["Angle"] },
+    {
+      segments: haircarePackage.research.segments,
+      messaging_angles: ["Angle"],
+      sources: haircarePackage.research.sources,
+    },
+  ],
+  [
+    "research without sources",
+    audienceResearch,
+    { ...haircarePackage.research, sources: [] },
+  ],
+  [
+    "research source with an empty title",
+    researchSource,
+    { title: "", url: "https://example.com/source" },
+  ],
+  [
+    "research source with a non-http URL",
+    researchSource,
+    { title: "Unsafe source", url: "javascript:alert(1)" },
   ],
   ["copy variant", copyVariant, { ...haircarePackage.copy[0], cta: "" }],
   ["direction", creativeDirection, { ...haircarePackage.direction, image_prompts: [] }],

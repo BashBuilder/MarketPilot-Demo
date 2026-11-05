@@ -73,6 +73,25 @@ export function ResearchCard({ research, className }: ResearchCardProps) {
           </ul>
         </section>
       </div>
+
+      <section aria-label="Research sources" className="flex flex-col gap-xs">
+        <h3 className="text-sm font-medium">Sources</h3>
+        <ul className="flex flex-col gap-2xs text-sm">
+          {research.sources.map((source) => (
+            <li key={source.url}>
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-words text-brand underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                {source.title}
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
     </section>
   );
 }

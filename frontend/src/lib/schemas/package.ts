@@ -15,10 +15,21 @@ export const audienceSegment = z.object({
   description: text,
 });
 
+export const researchSource = z.object({
+  title: text,
+  // Only http(s) links may become anchors in the UI; this blocks javascript:
+  // and other executable URL schemes from backend data.
+  url: z
+    .string()
+    .url()
+    .regex(/^https?:\/\//i, "must be an http(s) URL"),
+});
+
 export const audienceResearch = z.object({
   segments: z.array(audienceSegment).min(1),
   pain_points: z.array(text).min(1),
   messaging_angles: z.array(text).min(1),
+  sources: z.array(researchSource).min(1),
 });
 
 export const copyVariant = z.object({
@@ -95,6 +106,7 @@ export const campaignPackage = z.object({
 });
 
 export type CampaignBrief = z.infer<typeof campaignBrief>;
+export type ResearchSource = z.infer<typeof researchSource>;
 export type AudienceResearch = z.infer<typeof audienceResearch>;
 export type CopyVariant = z.infer<typeof copyVariant>;
 export type CreativeDirection = z.infer<typeof creativeDirection>;

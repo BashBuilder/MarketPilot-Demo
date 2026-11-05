@@ -1,44 +1,31 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { appPages } from "./pages";
 
-// These IDs match src/mocks/fixtures/campaign.ts. The mock API seeds one
-// campaign and one run so each page can be reached without setup.
-const campaignId = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
-const runId = "0f8fad5b-d9cb-469f-a165-70867728950e";
+const THEME_STORAGE_KEY = "marketpilot-theme";
+const themes = ["light", "dark"] as const;
+type Theme = (typeof themes)[number];
 
-const pages = [
-  {
-    name: "campaign list",
-    path: "/",
-    heading: "Campaigns",
-  },
-  {
-    name: "new campaign",
-    path: "/campaigns/new",
-    heading: "What should the agents create?",
-  },
-  {
-    name: "live run",
-    path: `/campaigns/${campaignId}/run/${runId}`,
-    heading: "Ready for your review",
-  },
-  {
-    name: "version review",
-    path: `/campaigns/${campaignId}/versions/1`,
-    heading: "Version 1",
-  },
-  {
-    name: "version history",
-    path: `/campaigns/${campaignId}/versions`,
-    heading: "Version history",
-  },
-  {
-    name: "campaign overview",
-    path: `/campaigns/${campaignId}`,
-    heading:
-      "Create an advertising campaign for a fictional hair-care product targeting adults aged 25 to 40",
-  },
-] as const;
+async function openInTheme(
+  page: Page,
+  path: string,
+  theme: Theme,
+): Promise<void> {
+  await page.addInitScript(
+    ([key, value]) => {
+      window.localStorage.setItem(key, value);
+    },
+    [THEME_STORAGE_KEY, theme],
+  );
+  await page.goto(path);
+
+  const root = page.locator("html");
+  if (theme === "dark") {
+    await expect(root).toHaveClass(/dark/);
+  } else {
+    await expect(root).not.toHaveClass(/dark/);
+  }
+}
 
 async function expectNoSeriousViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).analyze();
@@ -59,15 +46,17 @@ async function expectNoSeriousViolations(page: Page): Promise<void> {
   expect(violations, report).toEqual([]);
 }
 
-for (const entry of pages) {
-  test(`${entry.name} has no serious accessibility violations`, async ({
-    page,
-  }) => {
-    await page.goto(entry.path);
-    await expect(
-      page.getByRole("heading", { level: 1, name: entry.heading }),
-    ).toBeVisible({ timeout: 30_000 });
+for (const theme of themes) {
+  for (const entry of appPages) {
+    test(`${entry.name} has no serious violations in the ${theme} theme`, async ({
+      page,
+    }) => {
+      await openInTheme(page, entry.path, theme);
+      await expect(
+        page.getByRole("heading", { level: 1, name: entry.heading }),
+      ).toBeVisible({ timeout: 30_000 });
 
-    await expectNoSeriousViolations(page);
-  });
+      await expectNoSeriousViolations(page);
+    });
+  }
 }

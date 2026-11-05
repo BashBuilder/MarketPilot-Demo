@@ -23,6 +23,8 @@ describe("HandoffNote", () => {
   it("exposes the handoff ids and a machine-readable timestamp", () => {
     const { container } = render(<HandoffNote handoff={handoff} />);
 
+    expect(container.firstElementChild).toHaveClass("motion-safe:animate-in");
+    expect(container.firstElementChild).not.toHaveClass("animate-in");
     expect(container.firstElementChild).toHaveAttribute(
       "data-agent-from",
       "brief",
