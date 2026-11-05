@@ -12,7 +12,6 @@ from workflow_loop_fakes import (
     default_agents,
 )
 from workflow_run_support import (
-    add_version,
     checkpoint_nodes,
     dependencies,
     new_run,
@@ -62,7 +61,7 @@ async def _at_gate(
     emitter: RecordingEmitter,
     settings: Settings,
 ) -> UUID:
-    run_id, campaign_id = await new_run(factory)
+    run_id, _ = await new_run(factory)
     async with factory() as session:
         state = await run_workflow(
             run_id,
@@ -70,7 +69,6 @@ async def _at_gate(
             deps=dependencies(run_id, session, emitter, settings),
         )
     assert state.status == "awaiting_approval"
-    await add_version(factory, campaign_id)
     return run_id
 
 

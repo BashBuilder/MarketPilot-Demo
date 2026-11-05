@@ -37,6 +37,7 @@ from app.graph.routing import (
     reviewer_map,
 )
 from app.graph.state import WorkflowState
+from app.graph.versioning import snapshot_package
 from app.harness.checkpoints import (
     DONE_NODE,
     load_latest_checkpoint,
@@ -302,6 +303,7 @@ def _make_approval_node(deps: WorkflowDependencies) -> WorkflowNode:
     """Persist the human gate and expose it as the graph's terminal state."""
 
     async def approval(state: WorkflowState) -> WorkflowState:
+        await snapshot_package(deps.session, deps.run_id, state)
         await request_approval(deps.session, deps.run_id)
         state.status = "awaiting_approval"
         return state

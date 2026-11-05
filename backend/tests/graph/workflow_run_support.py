@@ -7,11 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from workflow_loop_fakes import IDEA, ScriptedAgent
 
 from app.core.config import Settings
-from app.database.repositories import campaigns, checkpoints, runs, versions
+from app.database.repositories import campaigns, checkpoints, runs
 from app.graph.node_support import NodeEventEmitter
-from app.graph.state import WorkflowState
 from app.graph.workflow import WorkflowDependencies
-from app.harness.checkpoints import load_latest_checkpoint
 
 
 def run_settings() -> Settings:
@@ -35,23 +33,6 @@ async def new_run(factory: async_sessionmaker[AsyncSession]) -> tuple[UUID, UUID
         return run.id, campaign.id
 
 
-async def add_version(
-    factory: async_sessionmaker[AsyncSession],
-    campaign_id: UUID,
-    *,
-    score: float = 82.0,
-) -> None:
-    """Human decisions need a version to attach the audit entry to."""
-    async with factory() as session:
-        await versions.create(
-            session,
-            campaign_id=campaign_id,
-            package={"brief": {}},
-            score=score,
-        )
-        await session.commit()
-
-
 def dependencies(
     run_id: UUID,
     session: AsyncSession,
@@ -66,13 +47,6 @@ def dependencies(
         tools={},
         settings=settings,
     )
-
-
-async def latest_state(factory: async_sessionmaker[AsyncSession], run_id: UUID) -> WorkflowState:
-    async with factory() as session:
-        state = await load_latest_checkpoint(session, run_id)
-    assert state is not None
-    return state
 
 
 async def checkpoint_nodes(factory: async_sessionmaker[AsyncSession], run_id: UUID) -> list[str]:
