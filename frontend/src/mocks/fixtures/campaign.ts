@@ -38,6 +38,7 @@ export const versionSummaryOne: VersionSummary = {
   parent_version: null,
   created_at: createdAt,
   total_score: 86,
+  run_status: "awaiting_approval",
 };
 
 export const versionSummaryTwo: VersionSummary = {
@@ -45,6 +46,7 @@ export const versionSummaryTwo: VersionSummary = {
   parent_version: 1,
   created_at: revisedAt,
   total_score: 91,
+  run_status: "awaiting_approval",
 };
 
 export const versionOne: CampaignVersion = {

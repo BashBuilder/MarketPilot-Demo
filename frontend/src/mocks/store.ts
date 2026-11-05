@@ -78,6 +78,7 @@ export class MockApiStore {
       parent_version: version.parent_version,
       created_at: version.created_at,
       total_score: version.package.score.total,
+      run_status: version.run_status,
     }));
   }
 

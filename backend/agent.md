@@ -106,7 +106,7 @@ Base path `/api/v1`. All bodies are JSON. Changes here must be mirrored in `fron
 - `POST /campaigns` with `{ idea: string }` returns `{ campaign_id, run_id }`
 - `GET /campaigns` returns a list of campaigns
 - `GET /campaigns/{id}` returns the campaign with its latest version
-- `GET /campaigns/{id}/versions` returns the version list
+- `GET /campaigns/{id}/versions` returns version summaries `{ version, parent_version, created_at, total_score, run_status }`
 - `GET /campaigns/{id}/versions/{n}` returns the full package for a version with `run_id` and `run_status`
 - `GET /campaigns/{id}/versions/{a}/diff/{b}` returns changed fields between two versions
 - `POST /runs/{run_id}/approve` with `{ comment?: string }` returns `{ run_id, status: "approved", version }`

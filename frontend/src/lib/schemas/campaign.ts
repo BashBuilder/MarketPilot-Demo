@@ -29,6 +29,7 @@ export const versionSummary = z.object({
   parent_version: z.number().int().positive().nullable(),
   created_at: isoDateTime,
   total_score: z.number().min(0).max(100).nullable(),
+  run_status: runStatus,
 });
 
 export const versionList = z.array(versionSummary);

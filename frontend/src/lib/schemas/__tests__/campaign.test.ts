@@ -39,6 +39,10 @@ describe("campaign schemas", () => {
     expect(
       campaignVersion.safeParse({ ...versionOne, run_status: "paused" }).success,
     ).toBe(false);
+    expect(
+      versionSummary.safeParse({ ...versionSummaryOne, run_status: undefined })
+        .success,
+    ).toBe(false);
   });
 
   it("parses a version diff", () => {
