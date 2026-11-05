@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.contracts import ChatMessage, LLMClient, ToolInvoker
 from app.core.config import Settings, get_settings
 from app.database.session import session_scope
+from app.events.bus import EventBus, InMemoryEventBus
+from app.events.emitter import make_emitter
 from app.graph.node_support import NodeEventEmitter
 from app.graph.nodes import NodeAgent
 from app.graph.workflow import WorkflowDependencies
@@ -52,10 +54,6 @@ class WorkflowContext:
     deps: WorkflowDependencies
 
 
-async def _discard_event(_event: str, _data: Mapping[str, Any]) -> None:
-    return None
-
-
 class _UnavailableLLM:
     async def structured(
         self,
@@ -67,11 +65,13 @@ class _UnavailableLLM:
         raise RuntimeError("no LLM client is configured for API requests")
 
 
+DEFAULT_EVENT_BUS: EventBus = InMemoryEventBus()
+
 DEFAULT_WORKFLOW_SERVICES = WorkflowServices(
     agents={},
     llm=_UnavailableLLM(),
     tools={},
-    emit=_discard_event,
+    emit=make_emitter(DEFAULT_EVENT_BUS),
 )
 
 
@@ -95,6 +95,14 @@ def get_workflow_services(request: Request) -> WorkflowServices:
     if services is None:
         raise RuntimeError("workflow services are not configured")
     return cast(WorkflowServices, services)
+
+
+def get_event_bus(request: Request) -> EventBus:
+    """Return the process-wide event bus used for replay and live streams."""
+    bus = getattr(request.app.state, "event_bus", None)
+    if bus is None:
+        raise RuntimeError("event bus is not configured")
+    return cast(EventBus, bus)
 
 
 def get_workflow_context(

@@ -17,6 +17,7 @@ from app.agents.contracts import EventEmitter, LLMClient, ToolInvoker
 from app.core.config import Settings
 from app.core.errors import RetryExhausted
 from app.database.repositories import agent_outputs
+from app.events.emitter import bind_event_emitter
 from app.graph.node_support import (
     NodeEventEmitter,
     event_payload,
@@ -73,13 +74,14 @@ def make_node(agent: NodeAgent, deps: NodeDependencies) -> WorkflowNode:
         context = build_agent_context(state, agent.name, agent.context_budget)
         relay = verification_event_emitter(deps.emit, run_id=deps.run_id, agent=agent.name)
         try:
-            output = await agent.run(
-                context,
-                deps.llm,
-                emit=relay,
-                tools=deps.tools,
-                settings=deps.settings,
-            )
+            with bind_event_emitter(deps.emit):
+                output = await agent.run(
+                    context,
+                    deps.llm,
+                    emit=relay,
+                    tools=deps.tools,
+                    settings=deps.settings,
+                )
         except RetryExhausted as exc:
             return await _escalate(state, agent.name, exc, deps)
 
@@ -110,6 +112,7 @@ async def _escalate(
     state.status = "escalated"
     state.errors.append(f"{agent}: {exc.message}")
     await save_checkpoint(deps.session, deps.run_id, agent, state)
+    await deps.session.commit()
     error = event_payload(deps.run_id, agent)
     error.update({"message": exc.message, "recoverable": False})
     await deps.emit("error", error)

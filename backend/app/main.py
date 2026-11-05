@@ -3,6 +3,7 @@
 import logging
 from collections.abc import AsyncIterator, Collection, Iterator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
@@ -11,9 +12,14 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api.campaigns import router as campaigns_router
-from app.api.dependencies import DEFAULT_WORKFLOW_SERVICES, RecordingRunLauncher
+from app.api.dependencies import (
+    DEFAULT_EVENT_BUS,
+    DEFAULT_WORKFLOW_SERVICES,
+    RecordingRunLauncher,
+)
 from app.api.runs import router as runs_router
 from app.api.schemas import ErrorDetail, ErrorResponse
+from app.api.stream import router as stream_router
 from app.api.versions import router as versions_router
 from app.core.config import get_settings
 from app.core.errors import (
@@ -24,17 +30,28 @@ from app.core.errors import (
     ValidationFailure,
 )
 from app.core.logging import configure_logging
+from app.events.bus import RedisEventBus
+from app.events.emitter import make_emitter
 
 logger = logging.getLogger(__name__)
 API_PREFIX = "/api/v1"
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Validate configuration before serving, then configure JSON logging."""
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    """Validate configuration, configure logging and attach the Redis bus."""
     settings = get_settings()
     configure_logging(settings.log_level)
-    yield
+    bus = RedisEventBus.from_url(settings.redis_url)
+    application.state.event_bus = bus
+    application.state.workflow_services = replace(
+        DEFAULT_WORKFLOW_SERVICES,
+        emit=make_emitter(bus),
+    )
+    try:
+        yield
+    finally:
+        await bus.close()
 
 
 class _FrontendOriginAllowlist(Collection[str]):
@@ -84,6 +101,7 @@ def _error_response(
 
 app = FastAPI(title="MarketPilot API", version="0.1.0", lifespan=lifespan)
 app.state.run_launcher = RecordingRunLauncher()
+app.state.event_bus = DEFAULT_EVENT_BUS
 app.state.workflow_services = DEFAULT_WORKFLOW_SERVICES
 app.add_middleware(
     CORSMiddleware,
@@ -97,6 +115,7 @@ api_router.add_api_route("/health", health, methods=["GET"], name="api_health")
 api_router.include_router(campaigns_router)
 api_router.include_router(versions_router)
 api_router.include_router(runs_router)
+api_router.include_router(stream_router)
 app.include_router(api_router)
 app.add_api_route("/health", health, methods=["GET"], name="health")
 

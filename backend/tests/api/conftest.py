@@ -1,6 +1,7 @@
 """Shared fixtures for API tests."""
 
 from collections.abc import AsyncIterator, Iterator
+from dataclasses import replace
 
 import pytest
 from api_support import FRONTEND_ORIGIN, MAX_IDEA_LENGTH
@@ -8,9 +9,16 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.api.dependencies import RecordingRunLauncher, get_run_launcher, get_session
+from app.api.dependencies import (
+    DEFAULT_WORKFLOW_SERVICES,
+    RecordingRunLauncher,
+    get_run_launcher,
+    get_session,
+)
 from app.core.config import get_settings
 from app.database.models import Base
+from app.events.bus import InMemoryEventBus
+from app.events.emitter import make_emitter
 from app.main import app
 
 
@@ -24,6 +32,22 @@ def _settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def event_bus() -> Iterator[InMemoryEventBus]:
+    """Install a fresh bus so API tests never touch the lifespan Redis client."""
+    bus = InMemoryEventBus()
+    previous_bus = app.state.event_bus
+    previous_services = app.state.workflow_services
+    app.state.event_bus = bus
+    app.state.workflow_services = replace(
+        DEFAULT_WORKFLOW_SERVICES,
+        emit=make_emitter(bus),
+    )
+    yield bus
+    app.state.event_bus = previous_bus
+    app.state.workflow_services = previous_services
 
 
 @pytest.fixture()

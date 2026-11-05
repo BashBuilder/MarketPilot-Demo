@@ -9,6 +9,7 @@ import json
 import logging
 import time
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -19,6 +20,7 @@ from app.core.errors import GuardrailViolation, ValidationFailure
 from app.core.logging import bind_run_context
 from app.database.repositories import tool_calls
 from app.database.repositories.tool_calls import ToolCallStatus
+from app.events.emitter import current_event_emitter
 from app.harness.guardrails import RunGuardrails
 from app.harness.registry import AgentName, ToolRegistry
 
@@ -114,3 +116,29 @@ class ToolCallMiddleware:
                 raise
             # Never mask the tool failure with an audit write failure.
             logger.exception("failed to record %s tool call %s", status, name)
+        await self._publish_tool_event(name, duration_ms, status)
+
+    async def _publish_tool_event(
+        self,
+        name: str,
+        duration_ms: int,
+        status: ToolCallStatus,
+    ) -> None:
+        """Publish through the emitter bound to the current node, if present."""
+        emit = current_event_emitter()
+        if emit is None:
+            return
+        data = {
+            "run_id": str(self._run_id),
+            "timestamp": datetime.now(UTC).isoformat(),
+            "agent": self._agent,
+            "tool": name,
+            "duration_ms": duration_ms,
+            "status": status,
+        }
+        try:
+            await emit("tool_called", data)
+        except Exception:
+            # SSE is observability; a transport hiccup must not mask the tool
+            # result that was already audited.
+            logger.exception("failed to publish tool_called for %s", name)

@@ -397,9 +397,15 @@ def _make_approval_node(deps: WorkflowDependencies) -> WorkflowNode:
     """Persist the human gate and expose it as the graph's terminal state."""
 
     async def approval(state: WorkflowState) -> WorkflowState:
-        await snapshot_package(deps.session, deps.run_id, state)
+        version = await snapshot_package(deps.session, deps.run_id, state)
         await request_approval(deps.session, deps.run_id)
         state.status = "awaiting_approval"
+        # Persist before announcing: the stream closes on this event, and a
+        # client that immediately reloads the run must see the gate.
+        await deps.session.commit()
+        data = event_payload(deps.run_id, "human")
+        data["version"] = version.version
+        await deps.emit("awaiting_approval", data)
         return state
 
     return approval
