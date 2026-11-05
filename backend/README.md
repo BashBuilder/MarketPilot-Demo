@@ -10,3 +10,14 @@ uv sync
 uv run uvicorn app.main:app --reload
 uv run pytest
 ```
+
+## Configuration
+
+Settings load from the environment, and a local `.env` file if present. Startup
+fails with a validation error naming any missing required variable.
+
+Required: `DEEPSEEK_API_KEY`, `DATABASE_URL`, `REDIS_URL`.
+
+Optional with defaults: `DEEPSEEK_BASE_URL`, `IMAGE_PROVIDER` (`fake`, `flux`,
+`sdxl`), `COST_CAP_PER_RUN`, `FRONTEND_ORIGIN`, `LOG_LEVEL`.
+
