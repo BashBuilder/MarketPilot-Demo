@@ -9,9 +9,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
-# Must match the embedding model chosen in a later step. Changing it requires a
-# migration that rewrites the pgvector column.
-EMBEDDING_DIMENSIONS = 1536
+# Must match the selected local model. Changing it requires a migration that
+# rewrites the pgvector column and a startup re-embed of seeded policies.
+EMBEDDING_DIMENSIONS = 384
 
 PolicyMetadata = dict[str, Any]
 

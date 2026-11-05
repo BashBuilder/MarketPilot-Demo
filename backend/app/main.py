@@ -30,6 +30,8 @@ from app.core.errors import (
     ValidationFailure,
 )
 from app.core.logging import configure_logging
+from app.database.seed import seed
+from app.database.session import session_scope
 from app.events.bus import RedisEventBus
 from app.events.emitter import make_emitter
 
@@ -42,6 +44,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     """Validate configuration, configure logging and attach the Redis bus."""
     settings = get_settings()
     configure_logging(settings.log_level)
+    await _seed_policies()
     bus = RedisEventBus.from_url(settings.redis_url)
     application.state.event_bus = bus
     application.state.workflow_services = replace(
@@ -52,6 +55,12 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await bus.close()
+
+
+async def _seed_policies() -> None:
+    """Re-embed seeded policies when the configured embedder has changed."""
+    async with session_scope() as session:
+        await seed(session)
 
 
 class _FrontendOriginAllowlist(Collection[str]):

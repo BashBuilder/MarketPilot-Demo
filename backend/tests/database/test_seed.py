@@ -10,6 +10,15 @@ from sqlalchemy.pool import StaticPool
 from app.database.models import EMBEDDING_DIMENSIONS, Base, Campaign, PolicyDocument
 from app.database.seed import SAMPLE_POLICY_DOCUMENTS, seed
 from app.database.session import session_scope
+from app.llm.embeddings import FakeEmbedder
+
+
+class _NamedFakeEmbedder(FakeEmbedder):
+    """Fake embedder whose identity changes without changing the vectors."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__()
+        self.name = name
 
 
 @pytest.fixture()
@@ -49,3 +58,20 @@ async def test_seed_is_idempotent(engine: AsyncEngine) -> None:
         assert document.embedding is not None
         assert len(document.embedding) == EMBEDDING_DIMENSIONS
         assert document.embedding == first_embeddings[document.title]
+        assert document.doc_metadata["embedder"] == "fake"
+
+
+async def test_seed_reembeds_when_the_embedder_changes(engine: AsyncEngine) -> None:
+    async with session_scope(engine) as session:
+        await seed(session, embedder=_NamedFakeEmbedder("first"))
+
+    async with session_scope(engine) as session:
+        await seed(session, embedder=_NamedFakeEmbedder("second"))
+
+    async with session_scope(engine) as session:
+        documents = (await session.scalars(select(PolicyDocument))).all()
+
+    assert len(documents) == len(SAMPLE_POLICY_DOCUMENTS)
+    for document in documents:
+        assert document.embedding is not None
+        assert document.doc_metadata["embedder"] == "second"

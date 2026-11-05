@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.main import app
 
 REQUIRED_ENV = {
@@ -19,6 +19,12 @@ def test_startup_fails_fast_without_required_env(monkeypatch: pytest.MonkeyPatch
         monkeypatch.delenv(name, raising=False)
     get_settings.cache_clear()
 
+    async def no_seed() -> None:
+        return None
+
+    monkeypatch.setattr("app.main._seed_policies", no_seed)
+    monkeypatch.setattr("app.main.get_settings", lambda: Settings(_env_file=None))
+
     with pytest.raises(ValidationError, match="deepseek_api_key"):
         with TestClient(app):
             pass
@@ -30,6 +36,11 @@ def test_startup_succeeds_with_required_env(monkeypatch: pytest.MonkeyPatch) -> 
     for name, value in REQUIRED_ENV.items():
         monkeypatch.setenv(name, value)
     get_settings.cache_clear()
+
+    async def no_seed() -> None:
+        return None
+
+    monkeypatch.setattr("app.main._seed_policies", no_seed)
 
     try:
         with TestClient(app) as client:

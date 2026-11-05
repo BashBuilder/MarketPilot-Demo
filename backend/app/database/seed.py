@@ -58,7 +58,9 @@ async def seed(session: AsyncSession, embedder: Embedder | None = None) -> None:
     pending = [
         (title, source, content)
         for title, source, content in SAMPLE_POLICY_DOCUMENTS
-        if title not in existing or existing[title].embedding is None
+        if title not in existing
+        or existing[title].embedding is None
+        or existing[title].doc_metadata.get("embedder") != active_embedder.name
     ]
     if pending:
         vectors = await active_embedder.embed([content for _, _, content in pending])
@@ -70,11 +72,20 @@ async def seed(session: AsyncSession, embedder: Embedder | None = None) -> None:
                         title=title,
                         source=source,
                         content=content,
-                        doc_metadata={"category": "advertising", "version": "1.0"},
+                        doc_metadata={
+                            "category": "advertising",
+                            "version": "1.0",
+                            "embedder": active_embedder.name,
+                        },
                         embedding=vector,
                     )
                 )
             else:
+                # Reassign instead of mutating so SQLAlchemy sees the JSON change.
+                document.doc_metadata = {
+                    **document.doc_metadata,
+                    "embedder": active_embedder.name,
+                }
                 document.embedding = vector
 
     await session.flush()

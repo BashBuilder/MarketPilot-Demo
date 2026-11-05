@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 ImageProvider = Literal["fake", "flux", "sdxl"]
 SearchProviderName = Literal["fake"]
+EmbedderName = Literal["fake", "local"]
 
 
 class Settings(BaseSettings):
@@ -33,6 +34,7 @@ class Settings(BaseSettings):
     redis_url: str
     image_provider: ImageProvider = "fake"
     search_provider: SearchProviderName = "fake"
+    embedder: EmbedderName = "fake"
     asset_dir: Path = Path("assets")
     cost_cap_per_run: float = Field(default=2.0, gt=0)
     max_image_calls_per_run: int = Field(default=8, ge=0)

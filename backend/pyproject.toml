@@ -24,6 +24,11 @@ dependencies = [
     "uvicorn>=0.54.0",
 ]
 
+[project.optional-dependencies]
+embeddings = [
+    "sentence-transformers>=6.2.0",
+]
+
 [dependency-groups]
 dev = [
     "aiosqlite>=0.22.1",

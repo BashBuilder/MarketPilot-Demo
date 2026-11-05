@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateTable
 
 from app.database.models import (
+    EMBEDDING_DIMENSIONS,
     Base,
     Campaign,
     CampaignVersion,
@@ -67,7 +68,7 @@ def test_one_creative_score_per_version(engine: Engine) -> None:
 
 def test_policy_document_uses_pgvector_and_is_mutable(engine: Engine) -> None:
     ddl = str(CreateTable(PolicyDocument.__table__).compile(dialect=postgresql.dialect()))
-    assert "VECTOR(1536)" in ddl.upper()
+    assert f"VECTOR({EMBEDDING_DIMENSIONS})" in ddl.upper()
 
     inspector = inspect(engine)
     mutable_columns = {column["name"] for column in inspector.get_columns("policy_documents")}

@@ -19,7 +19,13 @@ fails with a validation error naming any missing required variable.
 Required: `DEEPSEEK_API_KEY`, `DATABASE_URL`, `REDIS_URL`.
 
 Optional with defaults: `DEEPSEEK_BASE_URL`, `IMAGE_PROVIDER` (`fake`, `flux`,
-`sdxl`), `COST_CAP_PER_RUN`, `MAX_IMAGE_CALLS_PER_RUN`,
-`MAX_SEARCH_CALLS_PER_RUN`, `RETRY_MAX_ATTEMPTS`, `SCORE_THRESHOLD`,
-`MAX_AUTO_LOOPS`, `FRONTEND_ORIGIN`, `LOG_LEVEL`.
+`sdxl`), `EMBEDDER` (`fake`, `local`), `COST_CAP_PER_RUN`,
+`MAX_IMAGE_CALLS_PER_RUN`, `MAX_SEARCH_CALLS_PER_RUN`, `RETRY_MAX_ATTEMPTS`,
+`SCORE_THRESHOLD`, `MAX_AUTO_LOOPS`, `FRONTEND_ORIGIN`, `LOG_LEVEL`.
+
+Startup seeds the policy documents and re-embeds them when `EMBEDDER` changes.
+`EMBEDDER=fake` is the default and needs no model files. `EMBEDDER=local` requires
+`uv sync --extra embeddings` and a pre-downloaded
+`sentence-transformers/all-MiniLM-L6-v2` (~90 MB). The application never downloads
+model files automatically.
 
