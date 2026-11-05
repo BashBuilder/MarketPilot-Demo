@@ -88,6 +88,12 @@ Frontend (`frontend/`):
 5. **Verify before claiming done.** Run the relevant lint, type check and tests and report the real results. Do not say something passes unless you ran it.
 6. **Ask when blocked.** If requirements are ambiguous, the contract needs to change, or a step's criteria cannot be met, stop and ask rather than guessing.
 7. **Keep the user informed.** After each step, summarize what changed, what was verified, and what is next.
+8. **Keep every new file under ~150 lines.** If it grows past that, split it into modules.
+9. Create or edit one file at a time, then run its test or type check before the next file.
+10. Never paste a whole file back to rewrite it. Use targeted edits.
+11. Do not read lockfiles, generated output, images, or whole directories. Open only the files the step names.
+12. Do not summarize or re-explain finished work. Report in three lines: changed, verified, next.
+13. Stop after the current step. Never start the next step on your own.
 
 ## 8. Git Conventions
 
