@@ -1,14 +1,15 @@
-"""Deterministic fake and guarded local embedder behaviour."""
+"""Deterministic fake and hosted HuggingFace embedder behaviour."""
 
 from types import SimpleNamespace
 
 import pytest
+from pydantic import SecretStr
 
 from app.database.models import EMBEDDING_DIMENSIONS
 from app.llm.embeddings import (
-    LOCAL_MODEL_NAME,
+    DEFAULT_HF_MODEL,
     FakeEmbedder,
-    LocalEmbedder,
+    HuggingFaceEmbedder,
     get_embedder,
 )
 
@@ -47,58 +48,68 @@ def test_dimensions_must_be_positive() -> None:
         FakeEmbedder(dimensions=0)
 
 
-def test_fake_mode_never_imports_the_local_stack(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fake_mode_never_imports_the_huggingface_stack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def explode(_: str) -> None:
-        raise AssertionError("fake mode must not import sentence-transformers")
+        raise AssertionError("fake mode must not import langchain-huggingface")
 
     monkeypatch.setattr("app.llm.embeddings.import_module", explode)
 
     assert isinstance(get_embedder("fake"), FakeEmbedder)
 
 
-def test_local_embedder_never_downloads_a_missing_model(
+def test_huggingface_embedder_requires_a_token() -> None:
+    with pytest.raises(RuntimeError, match="HUGGINGFACEHUB_API_TOKEN"):
+        HuggingFaceEmbedder(DEFAULT_HF_MODEL, None)
+
+
+async def test_huggingface_embedder_wraps_the_endpoint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, object] = {}
 
-    class MissingModel:
-        def __init__(self, name: str, **kwargs: object) -> None:
-            captured["name"] = name
-            captured["kwargs"] = kwargs
-            raise OSError("not cached")
+    class FakeEndpoint:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
 
-    monkeypatch.setattr(
-        "app.llm.embeddings.import_module",
-        lambda _: SimpleNamespace(SentenceTransformer=MissingModel),
-    )
-
-    with pytest.raises(RuntimeError, match="never downloads"):
-        LocalEmbedder()
-
-    assert captured["name"] == LOCAL_MODEL_NAME
-    assert captured["kwargs"] == {
-        "local_files_only": True,
-    }
-
-
-async def test_local_embedder_wraps_the_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    class FakeModel:
-        def __init__(self, name: str, *, local_files_only: bool) -> None:
-            assert name == LOCAL_MODEL_NAME
-            assert local_files_only is True
-
-        def get_sentence_embedding_dimension(self) -> int:
-            return EMBEDDING_DIMENSIONS
-
-        def encode(self, texts: list[str], **_: object) -> list[list[float]]:
+        async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
             return [[1.0] + [0.0] * (EMBEDDING_DIMENSIONS - 1) for _ in texts]
 
     monkeypatch.setattr(
         "app.llm.embeddings.import_module",
-        lambda _: SimpleNamespace(SentenceTransformer=FakeModel),
+        lambda _: SimpleNamespace(HuggingFaceEndpointEmbeddings=FakeEndpoint),
     )
 
-    vectors = await LocalEmbedder().embed(["policy", "claims"])
+    embedder = HuggingFaceEmbedder(DEFAULT_HF_MODEL, SecretStr("test-token"))
+    vectors = await embedder.embed(["policy", "claims"])
 
+    assert captured == {
+        "model": DEFAULT_HF_MODEL,
+        "task": "feature-extraction",
+        "huggingfacehub_api_token": "test-token",
+    }
+    assert embedder.name == f"huggingface:{DEFAULT_HF_MODEL}"
     assert len(vectors) == 2
     assert len(vectors[0]) == EMBEDDING_DIMENSIONS
+
+
+async def test_huggingface_embedder_rejects_wrong_dimensions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class WrongEndpoint:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+            return [[1.0, 0.0] for _ in texts]
+
+    monkeypatch.setattr(
+        "app.llm.embeddings.import_module",
+        lambda _: SimpleNamespace(HuggingFaceEndpointEmbeddings=WrongEndpoint),
+    )
+
+    embedder = HuggingFaceEmbedder(DEFAULT_HF_MODEL, SecretStr("test-token"))
+
+    with pytest.raises(RuntimeError, match="expected"):
+        await embedder.embed(["policy"])

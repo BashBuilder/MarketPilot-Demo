@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 ImageProvider = Literal["fake", "flux", "sdxl"]
 SearchProviderName = Literal["fake"]
-EmbedderName = Literal["fake", "local"]
+EmbedderName = Literal["fake", "huggingface"]
 
 
 class Settings(BaseSettings):
@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     image_provider: ImageProvider = "fake"
     search_provider: SearchProviderName = "fake"
     embedder: EmbedderName = "fake"
+    hf_embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", min_length=1)
+    huggingfacehub_api_token: SecretStr | None = None
     asset_dir: Path = Path("assets")
     cost_cap_per_run: float = Field(default=2.0, gt=0)
     max_image_calls_per_run: int = Field(default=8, ge=0)

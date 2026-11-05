@@ -4,9 +4,9 @@ Revision ID: 0002
 Revises: 0001
 Create Date: 2026-11-05
 
-The local sentence-transformers model returns 384 dimensions. Policy vectors are
-derived data, so the column is recreated empty and startup seeding re-embeds the
-sample policies with the active embedder.
+The selected HuggingFace sentence-transformers model returns 384 dimensions.
+Policy vectors are derived data, so the column is recreated empty and startup
+seeding re-embeds the sample policies with the active embedder.
 """
 
 from collections.abc import Sequence

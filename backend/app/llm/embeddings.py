@@ -1,17 +1,17 @@
-"""Embedding abstraction with a deterministic fake and an optional local model."""
+"""Embedding selection: deterministic fake or hosted HuggingFace endpoint."""
 
-import asyncio
 import hashlib
 import math
 import re
 from importlib import import_module
 from typing import Any, Protocol
 
+from pydantic import SecretStr
+
 from app.core.config import EmbedderName, get_settings
 from app.database.models import EMBEDDING_DIMENSIONS
 
-LOCAL_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-LOCAL_MODEL_SIZE = "~90 MB"
+DEFAULT_HF_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -60,58 +60,62 @@ class FakeEmbedder:
         return [value / norm for value in vector]
 
 
-class LocalEmbedder:
-    """Sentence-transformers adapter that never downloads a model implicitly.
+class HuggingFaceEmbedder:
+    """LangChain adapter for the hosted HuggingFace feature-extraction API.
 
-    The optional dependency is imported lazily so fake mode and tests do not
-    load torch. ``local_files_only`` makes a missing cache a clear configuration
-    error instead of an unexpected network transfer.
+    No model files are downloaded and torch is not imported. The optional
+    LangChain integration is imported lazily so fake mode stays dependency-free.
     """
 
-    name = LOCAL_MODEL_NAME
     dimensions = EMBEDDING_DIMENSIONS
 
-    def __init__(self) -> None:
+    def __init__(self, model: str, token: SecretStr | None) -> None:
+        if token is None or not token.get_secret_value():
+            raise RuntimeError("EMBEDDER=huggingface requires HUGGINGFACEHUB_API_TOKEN")
+
+        self.name = f"huggingface:{model}"
         try:
-            module = import_module("sentence_transformers")
+            module = import_module("langchain_huggingface")
         except ImportError as exc:
             raise RuntimeError(
-                "EMBEDDER=local requires sentence-transformers; "
+                "EMBEDDER=huggingface requires langchain-huggingface; "
                 "install it with 'uv sync --extra embeddings'"
             ) from exc
 
-        model_type = module.SentenceTransformer
-        try:
-            self._model: Any = model_type(LOCAL_MODEL_NAME, local_files_only=True)
-        except Exception as exc:
-            raise RuntimeError(
-                f"local embedding model is not available: {LOCAL_MODEL_NAME} "
-                f"({LOCAL_MODEL_SIZE}). Download it explicitly before starting "
-                "the service; the application never downloads models automatically."
-            ) from exc
-
-        actual = int(self._model.get_sentence_embedding_dimension())
-        if actual != self.dimensions:
-            raise RuntimeError(
-                f"{LOCAL_MODEL_NAME} returns {actual} dimensions; expected {self.dimensions}"
-            )
+        endpoint_type = module.HuggingFaceEndpointEmbeddings
+        self._embeddings: Any = endpoint_type(
+            model=model,
+            task="feature-extraction",
+            huggingfacehub_api_token=token.get_secret_value(),
+        )
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        raw: Any = await asyncio.to_thread(
-            self._model.encode,
-            texts,
-            normalize_embeddings=True,
-            convert_to_numpy=True,
-            show_progress_bar=False,
-        )
-        return [[float(value) for value in vector] for vector in raw]
+        try:
+            raw: Any = await self._embeddings.aembed_documents(texts)
+        except Exception as exc:
+            raise RuntimeError(f"HuggingFace embedding request failed for {self.name}") from exc
+
+        vectors = [[float(value) for value in vector] for vector in raw]
+        for vector in vectors:
+            if len(vector) != self.dimensions:
+                raise RuntimeError(
+                    f"{self.name} returned {len(vector)} dimensions; expected {self.dimensions}"
+                )
+        return vectors
 
 
 def get_embedder(name: EmbedderName | None = None) -> Embedder:
     """Return the configured embedder, defaulting to the deterministic fake."""
-    selected = name if name is not None else get_settings().embedder
-    if selected == "local":
-        return LocalEmbedder()
+    if name == "fake":
+        return FakeEmbedder()
+
+    settings = get_settings()
+    selected = name if name is not None else settings.embedder
+    if selected == "huggingface":
+        return HuggingFaceEmbedder(
+            settings.hf_embedding_model,
+            settings.huggingfacehub_api_token,
+        )
     return FakeEmbedder()
