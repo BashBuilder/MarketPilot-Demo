@@ -1,0 +1,113 @@
+"""State fixtures shared by context budgeting tests."""
+
+from app.agents.outputs import (
+    AdCopySet,
+    AssetSet,
+    AudienceResearch,
+    CampaignBrief,
+    ComplianceReport,
+    CreativeDirection,
+    CreativeScore,
+)
+from app.graph.state import WorkflowState
+
+PACKAGE_FIELDS = ("brief", "research", "copy", "direction", "assets", "compliance", "score")
+
+
+def _dimension(score: float) -> dict[str, object]:
+    return {"score": score, "justification": "Clear rationale."}
+
+
+def state(**overrides: object) -> WorkflowState:
+    values: dict[str, object] = dict(
+        idea="Create an advertising campaign for a fictional hair-care product",
+        brief=CampaignBrief(
+            product="Aurelia Repair Shampoo",
+            goal="Launch a repair line for adults",
+            audience="Adults aged 25 to 40",
+            tone="Warm and confident",
+            channels=["Instagram"],
+            constraints=["No medical claims"],
+        ),
+        research=AudienceResearch(
+            segments=[{"name": "Professionals", "description": "Busy professionals."}],
+            pain_points=["Frizz"],
+            messaging_angles=["Repair without weight"],
+        ),
+        copy=AdCopySet(
+            variants=[
+                {
+                    "channel": "Instagram",
+                    "headline": "Repair starts here",
+                    "description": "A weekly ritual for colour-treated hair.",
+                    "cta": "Shop now",
+                }
+            ]
+        ),
+        direction=CreativeDirection(
+            image_prompts=["Soft-lit studio portrait"],
+            video_prompts=["Slow dolly shot"],
+            style_guide="Warm neutrals and editorial calm",
+            composition="Rule of thirds with open space",
+            negative_prompts=["watermark"],
+        ),
+        assets=AssetSet(
+            assets=[
+                {
+                    "uri": "s3://bucket/hero.png",
+                    "checksum": "a" * 64,
+                    "model": "flux",
+                    "seed": 1,
+                    "prompt": "Editorial portrait",
+                }
+            ]
+        ),
+        compliance=ComplianceReport(
+            items=[{"check": "Medical claims", "passed": True, "reason": "No claims found."}]
+        ),
+        score=CreativeScore(
+            brief_alignment=_dimension(8),
+            audience_fit=_dimension(7),
+            copy_quality=_dimension(9),
+            visual_quality=_dimension(8),
+            compliance_risk=_dimension(6),
+            total=76.0,
+        ),
+        versions=[1, 2],
+        status="awaiting_approval",
+        retry_counters={"research": 1},
+        errors=["copy retried once"],
+    )
+    values.update(overrides)
+    return WorkflowState.model_validate(values)
+
+
+def long_state() -> WorkflowState:
+    return state(
+        research=AudienceResearch(
+            segments=[
+                {"name": f"Segment {i}", "description": f"Segment {i} " + "detail " * 80}
+                for i in range(40)
+            ],
+            pain_points=[f"Pain {i} " + "detail " * 80 for i in range(40)],
+            messaging_angles=[f"Angle {i} " + "detail " * 80 for i in range(40)],
+        ),
+        copy=AdCopySet(
+            variants=[
+                {
+                    "channel": f"Channel {i}",
+                    "headline": f"Headline number {i}",
+                    "description": f"Description {i} " + "detail " * 120,
+                    "cta": f"Call to action {i} " + "now " * 40,
+                }
+                for i in range(10)
+            ]
+        ),
+        direction=CreativeDirection(
+            image_prompts=[f"Prompt {i} " + "detail " * 80 for i in range(10)],
+            video_prompts=["Video " + "detail " * 80],
+            style_guide="Style " + "detail " * 200,
+            composition="Composition " + "detail " * 200,
+            negative_prompts=["Negative " + "detail " * 80],
+        ),
+    )

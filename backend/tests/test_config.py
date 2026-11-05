@@ -36,6 +36,17 @@ def test_settings_load_from_environment(monkeypatch: pytest.MonkeyPatch) -> None
     assert settings.image_provider == "fake"
     assert settings.max_image_calls_per_run == 8
     assert settings.max_search_calls_per_run == 20
+    assert settings.retry_max_attempts == 3
+
+
+def test_settings_reject_zero_retry_attempts(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/marketpilot")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("RETRY_MAX_ATTEMPTS", "0")
+
+    with pytest.raises(ValidationError, match="retry_max_attempts"):
+        Settings(_env_file=None)
 
 
 def test_settings_reject_negative_call_caps(monkeypatch: pytest.MonkeyPatch) -> None:

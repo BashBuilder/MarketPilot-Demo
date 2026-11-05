@@ -7,7 +7,12 @@ from sqlalchemy import JSON, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database.models.base import Base, CreatedAtMixin, UUIDPrimaryKeyMixin
+from app.database.models.base import (
+    Base,
+    CreatedAtMixin,
+    UUIDPrimaryKeyMixin,
+    guard_immutable,
+)
 
 CheckpointState = dict[str, Any]
 
@@ -24,3 +29,6 @@ class WorkflowCheckpoint(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     state: Mapped[CheckpointState] = mapped_column(
         JSON().with_variant(JSONB(), "postgresql"), nullable=False
     )
+
+
+guard_immutable(WorkflowCheckpoint)

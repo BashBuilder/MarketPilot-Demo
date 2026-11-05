@@ -1,5 +1,12 @@
 """Harness infrastructure: tool permissions, guardrails, retries and state."""
 
+from app.harness.checkpoints import load_latest_checkpoint, save_checkpoint
+from app.harness.context import (
+    AGENT_CONTEXT_FIELDS,
+    build_agent_context,
+    estimate_context_tokens,
+    estimate_tokens,
+)
 from app.harness.guardrails import RunGuardrails, delimit_untrusted
 from app.harness.registry import (
     ALL_AGENTS,
@@ -8,13 +15,29 @@ from app.harness.registry import (
     ToolRegistry,
     ToolSpec,
 )
+from app.harness.retries import retry_async
+from app.harness.verification import (
+    VerificationEvent,
+    run_with_verification,
+    verify_output,
+)
 
 __all__ = [
+    "AGENT_CONTEXT_FIELDS",
     "ALL_AGENTS",
     "DEFAULT_ALLOWLIST",
     "AgentName",
     "RunGuardrails",
     "ToolRegistry",
     "ToolSpec",
+    "VerificationEvent",
+    "build_agent_context",
     "delimit_untrusted",
+    "estimate_context_tokens",
+    "estimate_tokens",
+    "load_latest_checkpoint",
+    "retry_async",
+    "run_with_verification",
+    "save_checkpoint",
+    "verify_output",
 ]

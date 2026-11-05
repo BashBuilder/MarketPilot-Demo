@@ -15,9 +15,23 @@ class MarketPilotError(Exception):
 
 
 class ToolError(MarketPilotError):
-    """A tool call failed and the caller must decide whether to retry."""
+    """A tool call failed and the caller must decide whether to retry.
+
+    Retryable failures are opt-in: only the raise site knows whether a failure
+    was transient, and retrying a permanent error only wastes budget.
+    """
 
     code = "tool_error"
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool = False,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message, details=details)
+        self.retryable = retryable
 
 
 class ValidationFailure(MarketPilotError):
@@ -36,3 +50,13 @@ class RetryExhausted(MarketPilotError):
     """A node exhausted its retry budget and must escalate."""
 
     code = "retry_exhausted"
+
+
+class ContextBudgetExceeded(MarketPilotError):
+    """An agent's context cannot be trimmed under its token budget.
+
+    The brief and compliance findings are protected, so a budget smaller than
+    those fields is a configuration error rather than something to trim away.
+    """
+
+    code = "context_budget_exceeded"
