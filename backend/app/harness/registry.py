@@ -38,8 +38,10 @@ ALL_AGENTS: frozenset[AgentName] = frozenset(
     )
 )
 
-# Section 5 allowlist. ``read_state`` is the only tool open to every agent;
-# ``export_package`` is additionally gated on human approval by the export tool.
+# Section 5 allowlist. ``read_state`` is open to every agent except the
+# Creative Director, which has no tools at all; ``export_package`` is
+# additionally gated on human approval by the export tool.
+_READ_STATE_AGENTS = ALL_AGENTS - frozenset({"creative_director"})
 DEFAULT_ALLOWLIST: Mapping[str, frozenset[AgentName]] = MappingProxyType(
     {
         "search_tools": frozenset({"research"}),
@@ -47,7 +49,7 @@ DEFAULT_ALLOWLIST: Mapping[str, frozenset[AgentName]] = MappingProxyType(
         "generate_image": frozenset({"designer"}),
         "edit_image": frozenset({"designer"}),
         "generate_video": frozenset({"designer"}),
-        "read_state": ALL_AGENTS,
+        "read_state": _READ_STATE_AGENTS,
         "export_package": frozenset({"reviewer"}),
     }
 )

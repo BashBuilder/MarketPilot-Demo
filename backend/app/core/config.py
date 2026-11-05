@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     cost_cap_per_run: float = Field(default=2.0, gt=0)
     max_image_calls_per_run: int = Field(default=8, ge=0)
     max_search_calls_per_run: int = Field(default=20, ge=0)
+    max_image_prompt_length: int = Field(default=1000, ge=1)
     retry_max_attempts: int = Field(default=3, ge=1)
     frontend_origin: str = "http://localhost:3000"
     log_level: LogLevel = "INFO"

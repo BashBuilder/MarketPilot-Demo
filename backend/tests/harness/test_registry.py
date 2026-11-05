@@ -51,6 +51,7 @@ def test_allowed_tools_follow_the_allowlist() -> None:
         "read_state",
     }
     assert names(reg.allowed_tools("copywriter")) == {"policy_lookup", "read_state"}
+    assert names(reg.allowed_tools("creative_director")) == set()
     assert names(reg.allowed_tools("reviewer")) == {
         "policy_lookup",
         "read_state",
@@ -59,9 +60,17 @@ def test_allowed_tools_follow_the_allowlist() -> None:
     assert names(reg.allowed_tools("supervisor")) == {"read_state"}
 
 
-@pytest.mark.parametrize("agent", sorted(ALL_AGENTS))
-def test_every_agent_can_read_state(agent: AgentName) -> None:
+@pytest.mark.parametrize("agent", sorted(ALL_AGENTS - {"creative_director"}))
+def test_every_tool_using_agent_can_read_state(agent: AgentName) -> None:
     assert registry().get_tool(agent, "read_state").name == "read_state"
+
+
+def test_creative_director_has_no_tools() -> None:
+    reg = registry()
+
+    assert reg.allowed_tools("creative_director") == []
+    with pytest.raises(GuardrailViolation, match="may not use"):
+        reg.get_tool("creative_director", "read_state")
 
 
 def test_denied_tool_raises_guardrail_violation() -> None:

@@ -6,6 +6,7 @@ from pydantic import TypeAdapter
 
 from app.agents.base import AgentPreparation, BaseAgent, ToolInvoker
 from app.agents.outputs import AudienceResearch
+from app.core.config import Settings
 from app.core.errors import ToolError
 from app.graph.state import WorkflowState
 from app.harness.registry import AgentName
@@ -26,8 +27,13 @@ class ResearchAgent(BaseAgent[AudienceResearch]):
     prompt_name = "research"
 
     async def prepare(
-        self, state: WorkflowState, tools: ToolInvoker | None
+        self,
+        state: WorkflowState,
+        tools: ToolInvoker | None,
+        *,
+        settings: Settings | None = None,
     ) -> AgentPreparation[AudienceResearch]:
+        del settings
         if tools is None:
             raise ToolError("research requires the search tool middleware")
 

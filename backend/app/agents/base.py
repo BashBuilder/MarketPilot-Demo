@@ -80,7 +80,7 @@ class BaseAgent[T: BaseModel]:
         generating override ``prepare``. Verification settings are injectable
         so tests never sleep or read the process environment.
         """
-        prepared = await self.prepare(state, tools)
+        prepared = await self.prepare(state, tools, settings=settings)
         prompt = load_prompt(self.prompt_name, prompts_dir=self.prompts_dir)
         messages: list[ChatMessage] = [
             {
@@ -113,9 +113,15 @@ class BaseAgent[T: BaseModel]:
             jitter=jitter,
         )
 
-    async def prepare(self, state: WorkflowState, tools: ToolInvoker | None) -> AgentPreparation[T]:
+    async def prepare(
+        self,
+        state: WorkflowState,
+        tools: ToolInvoker | None,
+        *,
+        settings: Settings | None = None,
+    ) -> AgentPreparation[T]:
         """Hook for tool-using agents; the default needs no extra context."""
-        del state, tools
+        del state, tools, settings
         return AgentPreparation[T]()
 
     def _context_block(self, state: WorkflowState) -> str:
