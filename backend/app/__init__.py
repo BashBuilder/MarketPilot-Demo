@@ -1,0 +1,1 @@
+"""MarketPilot backend application package."""
