@@ -30,7 +30,7 @@ export function LiveRunView({ campaignId, runId }: LiveRunViewProps) {
   const fatalErrors = state.errors.filter((error) => !error.recoverable);
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-lg">
+    <section className="mx-auto flex w-full max-w-[56rem] flex-col gap-lg">
       <header className="flex flex-col gap-2xs">
         <p className="text-2xs font-medium tracking-wider text-muted-foreground uppercase">
           Live run

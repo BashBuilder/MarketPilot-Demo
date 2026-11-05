@@ -26,7 +26,7 @@ export default function NewCampaignPage() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <section className="mx-auto flex w-full max-w-[48rem] flex-col gap-6">
       <header className="flex flex-col gap-2">
         <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           New campaign
