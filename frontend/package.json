@@ -5,12 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "dev:mock": "cross-env NEXT_PUBLIC_API_MOCKING=enabled next dev",
+    "dev:real": "cross-env NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1 next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=mock",
+    "e2e:mock": "playwright test --project=mock",
+    "e2e:real": "playwright test --project=real",
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {

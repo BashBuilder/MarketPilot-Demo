@@ -27,6 +27,12 @@ export interface MockRun {
   events: SseEvent[];
 }
 
+export interface ImportCampaignInput {
+  campaign_id: string;
+  run_id: string;
+  idea: string;
+}
+
 function diffKey(campaign: string, from: number, to: number): string {
   return `${campaign}:${from}:${to}`;
 }
@@ -91,11 +97,31 @@ export class MockApiStore {
   }
 
   createCampaign(idea: string): { campaign_id: string; run_id: string } {
-    const newCampaignId = crypto.randomUUID();
-    const newRunId = crypto.randomUUID();
+    const campaign_id = crypto.randomUUID();
+    const run_id = crypto.randomUUID();
+
+    this.addCampaign({ campaign_id, run_id, idea });
+
+    return { campaign_id, run_id };
+  }
+
+  /**
+   * Adds a campaign created in the browser mock to the server mock. The review
+   * page is rendered on the server, so it can only see campaigns mirrored here.
+   */
+  importCampaign(input: ImportCampaignInput): void {
+    if (this.campaigns.has(input.campaign_id)) return;
+    this.addCampaign(input);
+  }
+
+  private addCampaign({
+    campaign_id,
+    run_id,
+    idea,
+  }: ImportCampaignInput): void {
     const now = new Date().toISOString();
     const summary: CampaignSummary = {
-      id: newCampaignId,
+      id: campaign_id,
       idea,
       status: "awaiting_approval",
       latest_version: 1,
@@ -104,28 +130,34 @@ export class MockApiStore {
       updated_at: now,
     };
 
-    this.campaigns.set(newCampaignId, summary);
-    this.versions.set(newCampaignId, [
+    this.campaigns.set(campaign_id, summary);
+    this.versions.set(campaign_id, [
       {
         ...versionOne,
-        campaign_id: newCampaignId,
+        campaign_id,
         created_at: now,
-        run_id: newRunId,
+        run_id,
         run_status: "awaiting_approval",
       },
     ]);
-    this.runs.set(newRunId, {
-      id: newRunId,
-      campaign_id: newCampaignId,
+    this.runs.set(run_id, {
+      id: run_id,
+      campaign_id,
       status: "awaiting_approval",
-      events: buildScriptedRun(newRunId, 1),
+      events: buildScriptedRun(run_id, 1),
     });
-
-    return { campaign_id: newCampaignId, run_id: newRunId };
   }
 }
 
-export const mockStore = new MockApiStore();
+// Next bundles instrumentation and route handlers separately; a process-wide
+// singleton keeps the server mock store shared between them.
+const globalForMock = globalThis as typeof globalThis & {
+  __marketpilotMockStore?: MockApiStore;
+};
+
+export const mockStore =
+  globalForMock.__marketpilotMockStore ?? new MockApiStore();
+globalForMock.__marketpilotMockStore = mockStore;
 
 export function resetMockStore(): void {
   mockStore.reset();
