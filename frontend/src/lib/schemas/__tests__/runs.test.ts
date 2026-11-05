@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   approveRunRequest,
+  approveRunResponse,
   createCampaignRequest,
   createCampaignResponse,
   reviseRunRequest,
-  runActionResponse,
+  reviseRunResponse,
 } from "@/lib/schemas";
 
 describe("run schemas", () => {
@@ -51,15 +52,35 @@ describe("run schemas", () => {
     ).toBe(false);
   });
 
-  it("accepts a run action response and rejects an unknown status", () => {
+  it("accepts the approve response shape", () => {
     const response = {
       run_id: "0f8fad5b-d9cb-469f-a165-70867728950e",
       status: "approved",
       version: 1,
     };
-    expect(runActionResponse.safeParse(response).success).toBe(true);
+    expect(approveRunResponse.safeParse(response).success).toBe(true);
     expect(
-      runActionResponse.safeParse({ ...response, status: "pending" }).success,
+      approveRunResponse.safeParse({
+        ...response,
+        status: "revision_requested",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires a new run id on a revision response", () => {
+    const response = {
+      run_id: "0f8fad5b-d9cb-469f-a165-70867728950e",
+      status: "revision_requested",
+      version: 2,
+      new_run_id: "5f2c1d3a-8b6e-4f0a-9c7d-2e1b3a4c5d6e",
+    };
+    expect(reviseRunResponse.safeParse(response).success).toBe(true);
+    expect(
+      reviseRunResponse.safeParse({ ...response, new_run_id: undefined })
+        .success,
+    ).toBe(false);
+    expect(
+      reviseRunResponse.safeParse({ ...response, status: "approved" }).success,
     ).toBe(false);
   });
 });

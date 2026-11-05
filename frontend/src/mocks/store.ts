@@ -105,7 +105,13 @@ export class MockApiStore {
 
     this.campaigns.set(newCampaignId, summary);
     this.versions.set(newCampaignId, [
-      { ...versionOne, campaign_id: newCampaignId, created_at: now },
+      {
+        ...versionOne,
+        campaign_id: newCampaignId,
+        created_at: now,
+        run_id: newRunId,
+        run_status: "awaiting_approval",
+      },
     ]);
     this.runs.set(newRunId, {
       id: newRunId,

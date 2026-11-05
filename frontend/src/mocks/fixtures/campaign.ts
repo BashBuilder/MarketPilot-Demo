@@ -9,6 +9,7 @@ import { haircarePackage, revisedPackage } from "./package";
 
 export const campaignId = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 export const runId = "0f8fad5b-d9cb-469f-a165-70867728950e";
+export const revisionRunId = "5f2c1d3a-8b6e-4f0a-9c7d-2e1b3a4c5d6e";
 
 export const createdAt = "2026-11-05T09:00:00.000Z";
 export const updatedAt = "2026-11-05T09:04:12.000Z";
@@ -52,6 +53,8 @@ export const versionOne: CampaignVersion = {
   parent_version: null,
   created_at: createdAt,
   package: haircarePackage,
+  run_id: runId,
+  run_status: "awaiting_approval",
 };
 
 export const versionTwo: CampaignVersion = {
@@ -60,6 +63,8 @@ export const versionTwo: CampaignVersion = {
   parent_version: 1,
   created_at: revisedAt,
   package: revisedPackage,
+  run_id: revisionRunId,
+  run_status: "awaiting_approval",
 };
 
 export const revisionDiff: VersionDiff = {

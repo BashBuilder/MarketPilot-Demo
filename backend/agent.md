@@ -107,12 +107,14 @@ Base path `/api/v1`. All bodies are JSON. Changes here must be mirrored in `fron
 - `GET /campaigns` returns a list of campaigns
 - `GET /campaigns/{id}` returns the campaign with its latest version
 - `GET /campaigns/{id}/versions` returns the version list
-- `GET /campaigns/{id}/versions/{n}` returns the full package for a version
+- `GET /campaigns/{id}/versions/{n}` returns the full package for a version with `run_id` and `run_status`
 - `GET /campaigns/{id}/versions/{a}/diff/{b}` returns changed fields between two versions
-- `POST /runs/{run_id}/approve` with `{ comment?: string }`
-- `POST /runs/{run_id}/revise` with `{ comment: string, target_node?: string }`
+- `POST /runs/{run_id}/approve` with `{ comment?: string }` returns `{ run_id, status: "approved", version }`
+- `POST /runs/{run_id}/revise` with `{ comment: string, target_node?: string }` returns `{ run_id, status: "revision_requested", version, new_run_id }`
 - `GET /runs/{run_id}/stream` returns an SSE stream
 - `GET /health` returns 200
+
+`run_status` is one of `running`, `awaiting_approval`, `approved`, `revision_requested`, `failed`. `new_run_id` identifies the run that produces the next version.
 
 **SSE events** (each has `id`, `event`, and JSON `data` with `run_id`, `timestamp`, `agent`)
 

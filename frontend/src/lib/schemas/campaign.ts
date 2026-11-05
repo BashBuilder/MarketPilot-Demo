@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { campaignStatus, isoDateTime, text, uuid } from "./common";
+import {
+  campaignStatus,
+  isoDateTime,
+  runStatus,
+  text,
+  uuid,
+} from "./common";
 import { campaignPackage } from "./package";
 
 export const campaignSummary = z.object({
@@ -33,6 +39,8 @@ export const campaignVersion = z.object({
   parent_version: z.number().int().positive().nullable(),
   created_at: isoDateTime,
   package: campaignPackage,
+  run_id: uuid,
+  run_status: runStatus,
 });
 
 export const diffChange = z.object({

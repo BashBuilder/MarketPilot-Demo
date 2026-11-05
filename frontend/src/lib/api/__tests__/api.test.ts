@@ -55,19 +55,23 @@ describe("API client against the mock API", () => {
     expect(result.status).toBe("approved");
     expect(result.version).toBe(1);
     expect((await getCampaign(campaignId)).status).toBe("approved");
+    expect((await getVersion(campaignId, 1)).run_status).toBe("approved");
   });
 
-  it("revises a run into version 2 and exposes the diff", async () => {
+  it("revises a run into version 2 and exposes the new run", async () => {
     const result = await reviseRun(runId, {
       comment: "Sharper hook",
       target_node: "copywriter",
     });
     expect(result.status).toBe("revision_requested");
     expect(result.version).toBe(2);
+    expect(result.new_run_id).not.toBe(result.run_id);
     expect(await listVersions(campaignId)).toHaveLength(2);
 
     const version = await getVersion(campaignId, 2);
     expect(version.parent_version).toBe(1);
+    expect(version.run_id).toBe(result.new_run_id);
+    expect(version.run_status).toBe("awaiting_approval");
     expect(version.package.copy[0].headline).toContain("commute");
 
     const diff = await getVersionDiff(campaignId, 1, 2);

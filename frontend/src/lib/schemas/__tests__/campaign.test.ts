@@ -32,6 +32,15 @@ describe("campaign schemas", () => {
     expect(campaignVersion.safeParse(versionOne).success).toBe(true);
   });
 
+  it("rejects a version without run identity or with an unknown run status", () => {
+    expect(
+      campaignVersion.safeParse({ ...versionOne, run_id: undefined }).success,
+    ).toBe(false);
+    expect(
+      campaignVersion.safeParse({ ...versionOne, run_status: "paused" }).success,
+    ).toBe(false);
+  });
+
   it("parses a version diff", () => {
     expect(versionDiff.safeParse(revisionDiff).success).toBe(true);
   });
