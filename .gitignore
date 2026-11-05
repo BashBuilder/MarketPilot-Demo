@@ -1,0 +1,17 @@
+# Dependency directories
+node_modules/
+.venv/
+__pycache__/
+
+# Build output
+.next/
+dist/
+build/
+coverage/
+
+# Environment and generated assets
+.env
+generated_assets/
+
+# Model binaries
+*.safetensors
