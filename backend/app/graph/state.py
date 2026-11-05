@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from app.agents.outputs import (
     AdCopySet,
+    AgentNode,
     AssetSet,
     AudienceResearch,
     CampaignBrief,
@@ -46,6 +47,9 @@ class WorkflowState(BaseModel):
     assets: AssetSet | None = None
     compliance: ComplianceReport | None = None
     score: CreativeScore | None = None
+    # A human-chosen revision target; None lets the Supervisor pick the
+    # weakest dimension after a revise decision.
+    target_node: AgentNode | None = None
 
     versions: list[Annotated[int, Field(ge=1)]] = Field(default_factory=list)
     status: WorkflowStatus = "pending"
