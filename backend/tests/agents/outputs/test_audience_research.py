@@ -18,6 +18,12 @@ VALID = {
     ],
     "pain_points": ["Frizz after washing", "Colour fading quickly"],
     "messaging_angles": ["Repair without weighing hair down", "Colour that lasts"],
+    "sources": [
+        {
+            "url": "https://example.com/research/hair-care-trends",
+            "title": "Hair care trends: scalp-first routines",
+        }
+    ],
 }
 
 INVALID = {
@@ -32,6 +38,7 @@ def test_valid_research_parses() -> None:
 
     assert len(research.segments) == 2
     assert research.messaging_angles[0] == "Repair without weighing hair down"
+    assert str(research.sources[0].url) == "https://example.com/research/hair-care-trends"
 
 
 def test_invalid_research_is_rejected() -> None:
@@ -63,4 +70,19 @@ def test_short_segment_description_is_rejected() -> None:
     }
 
     with pytest.raises(ValidationError, match="description"):
+        AudienceResearch.model_validate(payload)
+
+
+def test_empty_sources_are_rejected() -> None:
+    with pytest.raises(ValidationError, match="sources"):
+        AudienceResearch.model_validate({**VALID, "sources": []})
+
+
+def test_invalid_source_url_is_rejected() -> None:
+    payload = {
+        **VALID,
+        "sources": [{"url": "not-a-url", "title": "Invented source"}],
+    }
+
+    with pytest.raises(ValidationError, match="url"):
         AudienceResearch.model_validate(payload)

@@ -33,6 +33,12 @@ def state(**overrides: object) -> WorkflowState:
             segments=[{"name": "Professionals", "description": "Busy professionals."}],
             pain_points=["Frizz"],
             messaging_angles=["Repair without weight"],
+            sources=[
+                {
+                    "url": "https://example.com/research/hair-care-trends",
+                    "title": "Hair care trends: scalp-first routines",
+                }
+            ],
         ),
         copy=AdCopySet(
             variants=[
@@ -91,6 +97,12 @@ def long_state() -> WorkflowState:
             ],
             pain_points=[f"Pain {i} " + "detail " * 80 for i in range(40)],
             messaging_angles=[f"Angle {i} " + "detail " * 80 for i in range(40)],
+            sources=[
+                {
+                    "url": "https://example.com/research/hair-care-trends",
+                    "title": "Hair care trends: scalp-first routines",
+                }
+            ],
         ),
         copy=AdCopySet(
             variants=[

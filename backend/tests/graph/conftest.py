@@ -34,6 +34,12 @@ def full_state() -> WorkflowState:
             segments=[{"name": "Professionals", "description": "Busy professionals."}],
             pain_points=["Frizz"],
             messaging_angles=["Repair without weight"],
+            sources=[
+                {
+                    "url": "https://example.com/research/hair-care-trends",
+                    "title": "Hair care trends: scalp-first routines",
+                }
+            ],
         ),
         copy=AdCopySet(
             variants=[

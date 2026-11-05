@@ -1,14 +1,15 @@
-"""Semantic checks for copy and generated assets.
+"""Semantic checks for briefs, copy and generated assets.
 
 These live apart from the verification loop: each validator knows one output
 type and returns human-readable issues, without caring how retries happen.
 """
 
 import hashlib
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Final
 
-from app.agents.outputs import AdCopySet, AssetSet
+from app.agents.outputs import AdCopySet, AssetSet, AudienceResearch, CampaignBrief
 
 type Issue = str
 
@@ -20,6 +21,38 @@ _IMAGE_SIGNATURES: Final[tuple[bytes, ...]] = (
     b"GIF87a",
     b"GIF89a",
 )
+
+
+class BriefSemanticValidator:
+    """Reject a brief that does not say what, why, for whom, or where."""
+
+    def validate(self, value: CampaignBrief) -> list[Issue]:
+        issues: list[Issue] = []
+        for field in ("product", "goal", "audience"):
+            if not getattr(value, field).strip():
+                issues.append(f"{field} must not be empty")
+        if not value.channels:
+            issues.append("at least one channel is required")
+        return issues
+
+
+class ResearchSourceValidator:
+    """Reject citations the search tool did not return in this run."""
+
+    def __init__(self, retrieved_urls: Iterable[str]) -> None:
+        self._retrieved = {_normalize_url(url) for url in retrieved_urls}
+
+    def validate(self, value: AudienceResearch) -> list[Issue]:
+        issues: list[Issue] = []
+        for source in value.sources:
+            url = str(source.url)
+            if _normalize_url(url) not in self._retrieved:
+                issues.append(f"source {url} was not retrieved by the search tool")
+        return issues
+
+
+def _normalize_url(url: str) -> str:
+    return url.rstrip("/")
 
 
 class CopySemanticValidator:

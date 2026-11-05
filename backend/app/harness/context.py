@@ -110,7 +110,7 @@ def _trim_free_text(context: WorkflowState, budget: int, estimate: TokenEstimato
     return context
 
 
-_SHRINK_SKIP = frozenset({"channel", "name", "headline", "uri", "checksum", "model", "seed"})
+_SHRINK_SKIP = frozenset({"channel", "name", "headline", "uri", "checksum", "model", "seed", "url"})
 
 
 def _shrink_sections(context: WorkflowState, limit: int) -> WorkflowState:
