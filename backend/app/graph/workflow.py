@@ -7,8 +7,9 @@ the pipeline and go straight to the human gate.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import pairwise
+from typing import Any
 from uuid import UUID
 
 from langgraph.graph import END, START, StateGraph
@@ -19,7 +20,7 @@ from app.agents.contracts import LLMClient, ToolInvoker
 from app.agents.scoring import weakest_node
 from app.core.config import Settings, get_settings
 from app.core.errors import ValidationFailure
-from app.database.models import ApprovalDecision, RunStatus
+from app.database.models import ApprovalDecision, RunStatus, WorkflowRun
 from app.database.repositories import campaigns, runs, versions
 from app.graph.node_support import NodeEventEmitter, event_payload
 from app.graph.nodes import NodeAgent, NodeDependencies, WorkflowNode, make_node
@@ -37,7 +38,7 @@ from app.graph.routing import (
     reviewer_map,
 )
 from app.graph.state import WorkflowState
-from app.graph.versioning import snapshot_package
+from app.graph.versioning import PACKAGE_FIELDS, snapshot_package
 from app.harness.checkpoints import (
     DONE_NODE,
     load_latest_checkpoint,
@@ -59,6 +60,32 @@ class WorkflowDependencies:
     emit: NodeEventEmitter
     tools: Mapping[AgentName, ToolInvoker]
     settings: Settings | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowContinuation:
+    """The run that ended this continuation plus its latest state."""
+
+    run_id: UUID
+    state: WorkflowState
+
+
+DEFAULT_REVISION_NODE = "copywriter"
+
+
+def resolve_revision_target(state: WorkflowState, target_node: str | None) -> str:
+    """Pick and validate the node a revision should rerun from."""
+    if target_node is None:
+        if state.score is not None:
+            return weakest_node(state.score)
+        return DEFAULT_REVISION_NODE
+    name = target_node.strip()
+    if name not in PIPELINE:
+        raise ValidationFailure(
+            f"target_node must be one of {sorted(PIPELINE)}",
+            details={"target_node": target_node},
+        )
+    return name
 
 
 def build_workflow(
@@ -192,12 +219,14 @@ async def continue_run(
     deps: WorkflowDependencies,
     comment: str | None = None,
     target_node: str | None = None,
-) -> WorkflowState:
-    """Record a human decision and drive the run to its next stop.
+    recorded: bool = False,
+) -> WorkflowContinuation:
+    """Drive a human decision to its next stop.
 
-    Approval finishes the run and emits ``completed``. A revision reruns from
-    the requested node, or from the weakest scoring dimension when no target is
-    given, while all outputs produced before that node stay in state.
+    ``recorded`` means the caller already appended the approval row, as the
+    approval operations do; otherwise the decision is recorded here. Approval
+    finishes the run. A revision completes the reviewed run and starts a new run
+    for the same campaign from the previous package, rerunning the chosen node.
     """
     _check_dependencies(run_id, deps)
     run = await runs.get(deps.session, run_id)
@@ -210,34 +239,98 @@ async def continue_run(
             f"run {run_id} has no checkpoint to continue from",
             details={"run_id": str(run_id)},
         )
-    if run.status is RunStatus.COMPLETED:
-        return state
+    if run.status is RunStatus.COMPLETED and not recorded:
+        return WorkflowContinuation(run_id=run_id, state=state)
 
     choice = ApprovalDecision(decision)
-    resolved_target = target_node
-    if choice is ApprovalDecision.REVISE and resolved_target is None and state.score is not None:
-        resolved_target = weakest_node(state.score)
-
-    next_node = await submit_decision(
-        deps.session,
-        run_id,
-        choice,
-        comment=comment,
-        target_node=resolved_target,
+    resolved_target = (
+        resolve_revision_target(state, target_node) if choice is ApprovalDecision.REVISE else None
     )
 
-    if next_node == DONE_NODE:
-        return await _complete(run_id, state, deps)
+    if not recorded:
+        await submit_decision(
+            deps.session,
+            run_id,
+            choice,
+            comment=comment,
+            target_node=resolved_target,
+        )
 
-    state.status = "running"
-    await deps.session.commit()
-    return await _drive(
+    if choice is ApprovalDecision.APPROVE:
+        approved = await _complete(run_id, state, deps)
+        return WorkflowContinuation(run_id=run_id, state=approved)
+
+    if resolved_target is None:
+        raise ValidationFailure(f"run {run_id} has no revision target")
+    return await _start_revision(
         run_id=run_id,
+        run=run,
+        target_node=resolved_target,
+        comment=comment,
         agents=agents,
         deps=deps,
-        start_node=next_node,
-        state=state,
     )
+
+
+async def _start_revision(
+    *,
+    run_id: UUID,
+    run: WorkflowRun,
+    target_node: str,
+    comment: str | None,
+    agents: Mapping[AgentName, NodeAgent],
+    deps: WorkflowDependencies,
+) -> WorkflowContinuation:
+    """Complete the reviewed run and continue the revision in a fresh run."""
+    campaign = await campaigns.get(deps.session, run.campaign_id)
+    if campaign is None:
+        raise ValueError(f"campaign not found for run {run_id}")
+    previous = await versions.get_latest(deps.session, run.campaign_id)
+    if previous is None:
+        raise ValidationFailure(
+            f"run {run_id} has no version to revise from",
+            details={"run_id": str(run_id)},
+        )
+
+    seeded = _seed_from_package(
+        idea=campaign.idea,
+        package=previous.package,
+        version=previous.version,
+        target_node=target_node,
+        feedback=comment,
+    )
+    await runs.set_status(deps.session, run_id, RunStatus.COMPLETED, current_node=None)
+    new_run = await runs.create(deps.session, campaign_id=run.campaign_id)
+    await deps.session.commit()
+
+    final = await _drive(
+        run_id=new_run.id,
+        agents=agents,
+        deps=replace(deps, run_id=new_run.id),
+        start_node=target_node,
+        state=seeded,
+    )
+    return WorkflowContinuation(run_id=new_run.id, state=final)
+
+
+def _seed_from_package(
+    *,
+    idea: str,
+    package: Mapping[str, Any],
+    version: int,
+    target_node: str,
+    feedback: str | None,
+) -> WorkflowState:
+    """Rebuild a writable state from an immutable version package."""
+    data: dict[str, Any] = {
+        "idea": idea,
+        "target_node": target_node,
+        "revision_feedback": feedback,
+        "versions": [version],
+    }
+    for field in PACKAGE_FIELDS:
+        data[field] = package.get(field)
+    return WorkflowState.model_validate(data)
 
 
 async def _complete(
@@ -260,6 +353,7 @@ async def _complete(
     version_number = version.version
     score = state.score.total if state.score is not None else version.score
     state.status = "completed"
+    await runs.set_status(deps.session, run_id, RunStatus.COMPLETED, current_node=None)
     await save_checkpoint(deps.session, run_id, DONE_NODE, state)
     await deps.session.commit()
 

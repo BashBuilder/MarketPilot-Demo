@@ -60,3 +60,9 @@ class ContextBudgetExceeded(MarketPilotError):
     """
 
     code = "context_budget_exceeded"
+
+
+class InvalidRunState(MarketPilotError):
+    """A run is not in the lifecycle state required for the requested action."""
+
+    code = "invalid_run_state"

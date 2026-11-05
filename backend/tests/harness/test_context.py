@@ -36,9 +36,21 @@ def test_agent_receives_only_mapped_fields(agent: AgentName) -> None:
 
 
 def test_mapping_matches_agent_responsibilities() -> None:
-    assert AGENT_CONTEXT_FIELDS["copywriter"] == frozenset({"brief", "research"})
-    assert AGENT_CONTEXT_FIELDS["designer"] == frozenset({"direction"})
-    assert AGENT_CONTEXT_FIELDS["reviewer"] == frozenset(PACKAGE_FIELDS)
+    assert AGENT_CONTEXT_FIELDS["copywriter"] == frozenset(
+        {"brief", "research", "copy", "revision_feedback"}
+    )
+    assert AGENT_CONTEXT_FIELDS["designer"] == frozenset(
+        {"direction", "assets", "revision_feedback"}
+    )
+    assert AGENT_CONTEXT_FIELDS["reviewer"] == frozenset(PACKAGE_FIELDS) | {"revision_feedback"}
+
+
+def test_revision_feedback_and_own_output_are_mapped() -> None:
+    source = state(revision_feedback="Tighten the claims")
+    context = build_agent_context(source, "copywriter", budget=100_000)
+
+    assert context.revision_feedback == "Tighten the claims"
+    assert context.copy == source.copy
 
 
 def test_long_fixture_stays_under_budget_and_keeps_protected_fields() -> None:

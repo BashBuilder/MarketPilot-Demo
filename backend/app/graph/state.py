@@ -51,6 +51,8 @@ class WorkflowState(BaseModel):
     # A human-chosen revision target; None lets the Supervisor pick the
     # weakest dimension after a revise decision.
     target_node: AgentNode | None = None
+    # The human's revision comment, available to the node rerun for that revision.
+    revision_feedback: str | None = None
 
     versions: list[Annotated[int, Field(ge=1)]] = Field(default_factory=list)
     status: WorkflowStatus = "pending"

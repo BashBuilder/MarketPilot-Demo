@@ -100,10 +100,10 @@ async def test_only_mapped_context_reaches_the_prompt_and_state_is_unchanged(
     user_message = request.messages[1]["content"]
     assert IDEA in user_message
     assert '"idea"' in user_message
-    assert '"brief"' not in user_message
+    assert '"brief"' in user_message
     assert '"research"' not in user_message
     assert "Frizz after washing" not in user_message
-    assert "Launch a campaign for colour-treated hair" not in user_message
+    assert "Launch a campaign for colour-treated hair" in user_message
     assert '<untrusted source="workflow-state">' in user_message
 
 

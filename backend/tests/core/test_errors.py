@@ -4,6 +4,7 @@ import pytest
 
 from app.core.errors import (
     GuardrailViolation,
+    InvalidRunState,
     MarketPilotError,
     RetryExhausted,
     ToolError,
@@ -18,6 +19,7 @@ from app.core.errors import (
         (ValidationFailure, "validation_failed"),
         (GuardrailViolation, "guardrail_violation"),
         (RetryExhausted, "retry_exhausted"),
+        (InvalidRunState, "invalid_run_state"),
     ],
 )
 def test_error_carries_stable_code_and_details(

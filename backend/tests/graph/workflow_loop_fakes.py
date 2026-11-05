@@ -134,6 +134,7 @@ class ScriptedAgent:
         self.outputs = list(outputs)
         self.error = error
         self.calls = 0
+        self.seen_state: Any | None = None
 
     async def run(
         self,
@@ -144,7 +145,8 @@ class ScriptedAgent:
         *,
         settings: object = None,
     ) -> Any:
-        del state, llm, emit, tools, settings
+        self.seen_state = state
+        del llm, emit, tools, settings
         self.calls += 1
         if self.error is not None:
             raise self.error

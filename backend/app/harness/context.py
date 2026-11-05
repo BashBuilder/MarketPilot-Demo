@@ -22,18 +22,22 @@ _PACKAGE_FIELDS = frozenset(
     {"brief", "research", "copy", "direction", "assets", "compliance", "score"}
 )
 _ROUTING_FIELDS = frozenset({"status", "retry_counters", "errors"})
+_REVISION_FIELDS = frozenset({"revision_feedback"})
 
 # ``idea`` is added to every slice: no agent can act without the user's request.
+# A revision target receives the human comment and its own previous output so it
+# can revise rather than regenerate from scratch.
 AGENT_CONTEXT_FIELDS: Mapping[AgentName, frozenset[str]] = MappingProxyType(
     {
-        "brief": frozenset(),
-        "research": frozenset({"brief"}),
-        "copywriter": frozenset({"brief", "research"}),
-        "creative_director": frozenset({"brief", "research", "copy"}),
-        "designer": frozenset({"direction"}),
-        "compliance": frozenset({"brief", "copy"}),
-        "reviewer": _PACKAGE_FIELDS,
-        "supervisor": _PACKAGE_FIELDS | _ROUTING_FIELDS,
+        "brief": _REVISION_FIELDS | frozenset({"brief"}),
+        "research": _REVISION_FIELDS | frozenset({"brief", "research"}),
+        "copywriter": _REVISION_FIELDS | frozenset({"brief", "research", "copy"}),
+        "creative_director": _REVISION_FIELDS
+        | frozenset({"brief", "research", "copy", "direction"}),
+        "designer": _REVISION_FIELDS | frozenset({"direction", "assets"}),
+        "compliance": _REVISION_FIELDS | frozenset({"brief", "copy", "compliance"}),
+        "reviewer": _REVISION_FIELDS | _PACKAGE_FIELDS,
+        "supervisor": _REVISION_FIELDS | _PACKAGE_FIELDS | _ROUTING_FIELDS,
     }
 )
 

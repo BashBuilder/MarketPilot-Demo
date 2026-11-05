@@ -82,7 +82,7 @@ async def test_revise_with_a_target_reruns_only_from_that_node(pg_session_factor
     reset_calls(agents)
 
     async with pg_session_factory() as session:
-        final = await continue_run(
+        continuation = await continue_run(
             run_id,
             ApprovalDecision.REVISE,
             agents=agents,
@@ -91,6 +91,8 @@ async def test_revise_with_a_target_reruns_only_from_that_node(pg_session_factor
             target_node="copywriter",
         )
 
+    final = continuation.state
+    assert continuation.run_id != run_id
     assert final.status == "awaiting_approval"
     assert final.copy == REVISED_COPY
     assert final.brief == BRIEF
@@ -102,10 +104,8 @@ async def test_revise_with_a_target_reruns_only_from_that_node(pg_session_factor
     assert agents["designer"].calls == 1
     assert agents["compliance"].calls == 1
     assert agents["reviewer"].calls == 1
-    assert await checkpoint_nodes(pg_session_factory, run_id) == [
-        *INITIAL_NODES,
-        *REVISION_NODES,
-    ]
+    assert await checkpoint_nodes(pg_session_factory, run_id) == INITIAL_NODES
+    assert await checkpoint_nodes(pg_session_factory, continuation.run_id) == REVISION_NODES
 
 
 async def test_revise_without_a_target_uses_the_weakest_node(pg_session_factory) -> None:
@@ -116,7 +116,7 @@ async def test_revise_without_a_target_uses_the_weakest_node(pg_session_factory)
     reset_calls(agents)
 
     async with pg_session_factory() as session:
-        final = await continue_run(
+        continuation = await continue_run(
             run_id,
             ApprovalDecision.REVISE,
             agents=agents,
@@ -124,15 +124,14 @@ async def test_revise_without_a_target_uses_the_weakest_node(pg_session_factory)
             comment="Improve the audience fit",
         )
 
+    final = continuation.state
     assert final.status == "awaiting_approval"
     assert agents["brief"].calls == 0
     assert agents["research"].calls == 1
     assert agents["copywriter"].calls == 1
     assert agents["reviewer"].calls == 1
-    assert await checkpoint_nodes(pg_session_factory, run_id) == [
-        *INITIAL_NODES,
-        *WEAKEST_NODES,
-    ]
+    assert await checkpoint_nodes(pg_session_factory, run_id) == INITIAL_NODES
+    assert await checkpoint_nodes(pg_session_factory, continuation.run_id) == WEAKEST_NODES
 
 
 async def test_approve_completes_and_emits_the_completed_event(pg_session_factory) -> None:
@@ -143,13 +142,15 @@ async def test_approve_completes_and_emits_the_completed_event(pg_session_factor
     reset_calls(agents)
 
     async with pg_session_factory() as session:
-        final = await continue_run(
+        continuation = await continue_run(
             run_id,
             ApprovalDecision.APPROVE,
             agents=agents,
             deps=dependencies(run_id, session, emitter, settings),
         )
 
+    final = continuation.state
+    assert continuation.run_id == run_id
     assert final.status == "completed"
     assert all(agent.calls == 0 for agent in agents.values())
 
