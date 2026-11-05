@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.database.models import Base, Campaign, PolicyDocument
+from app.database.models import EMBEDDING_DIMENSIONS, Base, Campaign, PolicyDocument
 from app.database.seed import SAMPLE_POLICY_DOCUMENTS, seed
 from app.database.session import session_scope
 
@@ -28,13 +28,24 @@ async def engine() -> AsyncIterator[AsyncEngine]:
 async def test_seed_is_idempotent(engine: AsyncEngine) -> None:
     async with session_scope(engine) as session:
         await seed(session)
+
+    async with session_scope(engine) as session:
+        documents = (await session.scalars(select(PolicyDocument))).all()
+        first_embeddings = {document.title: document.embedding for document in documents}
+
     async with session_scope(engine) as session:
         await seed(session)
 
     async with session_scope(engine) as session:
         campaign_count = await session.scalar(select(func.count()).select_from(Campaign))
-        titles = (await session.scalars(select(PolicyDocument.title))).all()
+        documents = (await session.scalars(select(PolicyDocument))).all()
 
     assert campaign_count == 1
-    assert set(titles) == {title for title, _, _ in SAMPLE_POLICY_DOCUMENTS}
-    assert len(titles) == len(SAMPLE_POLICY_DOCUMENTS)
+    assert {document.title for document in documents} == {
+        title for title, _, _ in SAMPLE_POLICY_DOCUMENTS
+    }
+    assert len(documents) == len(SAMPLE_POLICY_DOCUMENTS)
+    for document in documents:
+        assert document.embedding is not None
+        assert len(document.embedding) == EMBEDDING_DIMENSIONS
+        assert document.embedding == first_embeddings[document.title]

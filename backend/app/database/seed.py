@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Campaign, CampaignStatus, PolicyDocument
 from app.database.session import session_scope
+from app.llm.embeddings import Embedder, get_embedder
 
 DEMO_CAMPAIGN_ID = UUID("00000000-0000-4000-8000-000000000001")
 DEMO_CAMPAIGN_IDEA = (
@@ -15,7 +16,7 @@ DEMO_CAMPAIGN_IDEA = (
     "targeting adults aged 25 to 40"
 )
 
-# (title, source, content) — embeddings stay NULL until the ingestion step.
+# (title, source, content) — embeddings are computed with the active embedder.
 SAMPLE_POLICY_DOCUMENTS: tuple[tuple[str, str, str], ...] = (
     (
         "Medical claims",
@@ -38,8 +39,9 @@ SAMPLE_POLICY_DOCUMENTS: tuple[tuple[str, str, str], ...] = (
 )
 
 
-async def seed(session: AsyncSession) -> None:
-    """Insert missing demo rows; safe to call on every startup."""
+async def seed(session: AsyncSession, embedder: Embedder | None = None) -> None:
+    """Insert missing demo rows and backfill missing embeddings; idempotent."""
+    active_embedder = embedder if embedder is not None else get_embedder()
     if await session.get(Campaign, DEMO_CAMPAIGN_ID) is None:
         session.add(
             Campaign(
@@ -49,17 +51,31 @@ async def seed(session: AsyncSession) -> None:
             )
         )
 
-    existing_titles = set((await session.scalars(select(PolicyDocument.title))).all())
-    for title, source, content in SAMPLE_POLICY_DOCUMENTS:
-        if title not in existing_titles:
-            session.add(
-                PolicyDocument(
-                    title=title,
-                    source=source,
-                    content=content,
-                    doc_metadata={"category": "advertising", "version": "1.0"},
+    existing = {
+        document.title: document
+        for document in (await session.scalars(select(PolicyDocument))).all()
+    }
+    pending = [
+        (title, source, content)
+        for title, source, content in SAMPLE_POLICY_DOCUMENTS
+        if title not in existing or existing[title].embedding is None
+    ]
+    if pending:
+        vectors = await active_embedder.embed([content for _, _, content in pending])
+        for (title, source, content), vector in zip(pending, vectors, strict=True):
+            document = existing.get(title)
+            if document is None:
+                session.add(
+                    PolicyDocument(
+                        title=title,
+                        source=source,
+                        content=content,
+                        doc_metadata={"category": "advertising", "version": "1.0"},
+                        embedding=vector,
+                    )
                 )
-            )
+            else:
+                document.embedding = vector
 
     await session.flush()
 
