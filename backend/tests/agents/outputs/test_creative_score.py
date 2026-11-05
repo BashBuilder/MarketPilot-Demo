@@ -40,6 +40,23 @@ def test_out_of_range_dimension_is_rejected() -> None:
         CreativeScore.model_validate(payload)
 
 
+def test_missing_dimension_is_rejected() -> None:
+    payload = {key: value for key, value in VALID.items() if key != "visual_quality"}
+
+    with pytest.raises(ValidationError, match="visual_quality"):
+        CreativeScore.model_validate(payload)
+
+
+def test_blank_justification_is_rejected() -> None:
+    payload = {
+        **VALID,
+        "copy_quality": {"score": 9, "justification": "   "},
+    }
+
+    with pytest.raises(ValidationError, match="justification"):
+        CreativeScore.model_validate(payload)
+
+
 def test_multiline_justification_is_rejected() -> None:
     payload = {
         **VALID,

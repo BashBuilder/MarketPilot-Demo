@@ -14,7 +14,6 @@ from app.core.errors import GuardrailViolation, ToolError
 from app.database.models import ApprovalDecision, Asset, AssetKind, Base
 from app.database.repositories import approvals, campaigns, runs, versions
 from app.harness.registry import ToolRegistry
-from app.tools.export_models import ExportPackageArgs
 from app.tools.export_tools import EXPORT_TOOL_NAME, export_package, register_export_tools
 
 PACKAGE = {
@@ -119,21 +118,22 @@ async def test_approved_version_exports_package_and_assets(
     assert exported["model"] == "fake"
 
 
-async def test_registry_limits_export_to_reviewer(
+async def test_registry_denies_export_to_every_agent(
     session_factory: async_sessionmaker[AsyncSession], tmp_path: Path
 ) -> None:
-    version_id, _, _ = await make_version(
-        session_factory, tmp_path, decision=ApprovalDecision.APPROVE
-    )
     registry = ToolRegistry()
     register_export_tools(registry, session_factory=session_factory, asset_dir=tmp_path)
 
-    exported = await registry.get_tool("reviewer", EXPORT_TOOL_NAME).run(
-        ExportPackageArgs(version_id=version_id)
+    agents = (
+        "reviewer",
+        "brief",
+        "research",
+        "copywriter",
+        "creative_director",
+        "designer",
+        "compliance",
     )
-    assert exported.package_path.is_file()
-
-    for agent in ("brief", "research", "copywriter", "creative_director", "designer", "compliance"):
+    for agent in agents:
         with pytest.raises(GuardrailViolation, match="may not use"):
             registry.get_tool(agent, EXPORT_TOOL_NAME)  # type: ignore[arg-type]
 

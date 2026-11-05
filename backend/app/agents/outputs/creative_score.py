@@ -1,19 +1,13 @@
 """Weighted creative score produced by the Reviewer agent."""
 
-from typing import Annotated, Final, Self
+from typing import Annotated, Self
 
 from pydantic import Field, field_validator, model_validator
 
 from app.agents.outputs.base import OutputModel
+from app.agents.scoring import DIMENSION_WEIGHTS, weighted_total
 
-# Section 4 rubric: five equally weighted dimensions, total out of 100.
-DIMENSION_WEIGHTS: Final[dict[str, float]] = {
-    "brief_alignment": 0.2,
-    "audience_fit": 0.2,
-    "copy_quality": 0.2,
-    "visual_quality": 0.2,
-    "compliance_risk": 0.2,
-}
+__all__ = ["DIMENSION_WEIGHTS", "CreativeScore", "ScoreDimension"]
 
 
 class ScoreDimension(OutputModel):
@@ -46,14 +40,15 @@ class CreativeScore(OutputModel):
 
     @model_validator(mode="after")
     def _total_matches_dimensions(self) -> Self:
-        weighted = (
-            self.brief_alignment.score * DIMENSION_WEIGHTS["brief_alignment"]
-            + self.audience_fit.score * DIMENSION_WEIGHTS["audience_fit"]
-            + self.copy_quality.score * DIMENSION_WEIGHTS["copy_quality"]
-            + self.visual_quality.score * DIMENSION_WEIGHTS["visual_quality"]
-            + self.compliance_risk.score * DIMENSION_WEIGHTS["compliance_risk"]
+        expected = weighted_total(
+            {
+                "brief_alignment": self.brief_alignment.score,
+                "audience_fit": self.audience_fit.score,
+                "copy_quality": self.copy_quality.score,
+                "visual_quality": self.visual_quality.score,
+                "compliance_risk": self.compliance_risk.score,
+            }
         )
-        expected = round(weighted * 10, 2)
         if abs(self.total - expected) > 0.01:
             raise ValueError(f"total must equal the weighted dimensions ({expected})")
         return self

@@ -39,8 +39,9 @@ ALL_AGENTS: frozenset[AgentName] = frozenset(
 )
 
 # Section 5 allowlist. ``read_state`` is open to every agent except the
-# Creative Director, which has no tools at all; ``export_package`` is
-# additionally gated on human approval by the export tool.
+# Creative Director, which has no tools at all. ``export_package`` is not
+# granted to any agent: the API invokes it only after a recorded human
+# approval, so a model can never export on its own.
 _READ_STATE_AGENTS = ALL_AGENTS - frozenset({"creative_director"})
 DEFAULT_ALLOWLIST: Mapping[str, frozenset[AgentName]] = MappingProxyType(
     {
@@ -50,7 +51,6 @@ DEFAULT_ALLOWLIST: Mapping[str, frozenset[AgentName]] = MappingProxyType(
         "edit_image": frozenset({"designer"}),
         "generate_video": frozenset({"designer"}),
         "read_state": _READ_STATE_AGENTS,
-        "export_package": frozenset({"reviewer"}),
     }
 )
 

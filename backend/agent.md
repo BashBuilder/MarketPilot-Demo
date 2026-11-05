@@ -174,7 +174,7 @@ Declared as a per-agent allowlist in `harness/registry.py`. Default deny.
 - `policy_lookup` (pgvector, read-only): Copywriter, Compliance, Reviewer
 - `generate_image`, `edit_image`, `generate_video` (optional): Designer only
 - `read_state`: all agents
-- `export_package`: Reviewer, and only after human approval
+- `export_package`: no agent; the API invokes it only after a recorded human approval
 
 Rules:
 

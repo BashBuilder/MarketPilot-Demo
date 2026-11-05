@@ -52,11 +52,7 @@ def test_allowed_tools_follow_the_allowlist() -> None:
     }
     assert names(reg.allowed_tools("copywriter")) == {"policy_lookup", "read_state"}
     assert names(reg.allowed_tools("creative_director")) == set()
-    assert names(reg.allowed_tools("reviewer")) == {
-        "policy_lookup",
-        "read_state",
-        "export_package",
-    }
+    assert names(reg.allowed_tools("reviewer")) == {"policy_lookup", "read_state"}
     assert names(reg.allowed_tools("supervisor")) == {"read_state"}
 
 

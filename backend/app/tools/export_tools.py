@@ -106,7 +106,7 @@ def register_export_tools(
     session_factory: async_sessionmaker[AsyncSession],
     asset_dir: Path,
 ) -> None:
-    """Register export; the allowlist still limits it to Reviewer."""
+    """Register export; no agent may call it, only the approved API flow."""
     registry.register_tool(
         ToolSpec(
             name=EXPORT_TOOL_NAME,
