@@ -125,6 +125,16 @@ Base path `/api/v1`. All bodies are JSON. Changes here must be mirrored in `fron
 - `completed` (version, score)
 - `error` (message, recoverable)
 
+**Campaign summary shape** (items in `GET /campaigns`, and the top of `GET /campaigns/{id}`)
+`{ id, idea, status, latest_version: number | null, latest_score: number | null, active_run_id: string | null, created_at, updated_at }`
+
+**Stream behavior**
+
+- The `id` of each SSE event is opaque and increasing; clients send the last one back as `Last-Event-ID`.
+- The server closes the stream after a terminal event: `awaiting_approval`, `completed`, or `error` with `recoverable: false`.
+- Clients must not reconnect after a terminal event. They reconnect only after an unexpected drop.
+- `GET /health` exists at the root and under `/api/v1`.
+
 Clients can reconnect with `Last-Event-ID` and resume.
 
 **Package shape (per version):** `brief`, `research`, `copy` (variants per channel), `direction`, `assets` (uri, checksum, model, seed, prompt), `compliance` (items with pass/fail and reason), `score` (per-dimension scores, justifications, total).
