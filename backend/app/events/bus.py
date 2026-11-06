@@ -6,23 +6,23 @@ as ``Last-Event-ID`` and the server resumes strictly after it. Redis keys are
 """
 
 import json
+from collections import deque
 from collections.abc import Mapping
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from itertools import count
 from typing import Any, Protocol
 from uuid import UUID
 
 from redis.asyncio import Redis
 
+from app.events.envelope import (
+    DEFAULT_EVENT_STREAM_MAXLEN,
+    DEFAULT_EVENT_STREAM_TTL_SECONDS,
+    EventRecord,
+    event_body,
+    is_terminal,
+)
 
-@dataclass(frozen=True, slots=True)
-class EventRecord:
-    """One persisted event: its opaque id, type and section-2 body."""
-
-    id: str
-    event: str
-    data: dict[str, Any]
+__all__ = ["EventBus", "EventRecord", "InMemoryEventBus", "RedisEventBus", "event_body"]
 
 
 class EventBus(Protocol):
@@ -39,20 +39,14 @@ class EventBus(Protocol):
     async def read(self, run_id: UUID, after_id: str | None) -> list[EventRecord]: ...
 
 
-def event_body(run_id: UUID, agent: str, data: Mapping[str, Any]) -> dict[str, Any]:
-    """Build the envelope required by every SSE event in section 2."""
-    body: dict[str, Any] = dict(data)
-    body["run_id"] = str(run_id)
-    body["timestamp"] = datetime.now(UTC).isoformat()
-    body["agent"] = agent
-    return body
-
-
 class InMemoryEventBus:
     """Deterministic bus for tests; ids sort lexicographically like stream ids."""
 
-    def __init__(self) -> None:
-        self._streams: dict[UUID, list[EventRecord]] = {}
+    def __init__(self, maxlen: int = DEFAULT_EVENT_STREAM_MAXLEN) -> None:
+        if maxlen < 1:
+            raise ValueError("maxlen must be positive")
+        self._maxlen = maxlen
+        self._streams: dict[UUID, deque[EventRecord]] = {}
         self._sequence = count(1)
 
     async def publish(
@@ -64,25 +58,47 @@ class InMemoryEventBus:
     ) -> str:
         event_id = f"{next(self._sequence):020d}-0"
         record = EventRecord(id=event_id, event=event_type, data=event_body(run_id, agent, data))
-        self._streams.setdefault(run_id, []).append(record)
+        self._streams.setdefault(run_id, deque(maxlen=self._maxlen)).append(record)
         return event_id
 
     async def read(self, run_id: UUID, after_id: str | None) -> list[EventRecord]:
-        records = self._streams.get(run_id, [])
+        stream = self._streams.get(run_id)
+        if stream is None:
+            return []
         if after_id is None:
-            return list(records)
-        return [record for record in records if record.id > after_id]
+            return list(stream)
+        return [record for record in stream if record.id > after_id]
 
 
 class RedisEventBus:
     """Redis Streams implementation used by the running service."""
 
-    def __init__(self, client: Redis) -> None:
+    def __init__(
+        self,
+        client: Redis,
+        *,
+        maxlen: int = DEFAULT_EVENT_STREAM_MAXLEN,
+        ttl_seconds: int = DEFAULT_EVENT_STREAM_TTL_SECONDS,
+    ) -> None:
+        if maxlen < 1 or ttl_seconds < 1:
+            raise ValueError("maxlen and ttl_seconds must be positive")
         self._client = client
+        self._maxlen = maxlen
+        self._ttl_seconds = ttl_seconds
 
     @classmethod
-    def from_url(cls, url: str) -> "RedisEventBus":
-        return cls(Redis.from_url(url, decode_responses=True))
+    def from_url(
+        cls,
+        url: str,
+        *,
+        maxlen: int = DEFAULT_EVENT_STREAM_MAXLEN,
+        ttl_seconds: int = DEFAULT_EVENT_STREAM_TTL_SECONDS,
+    ) -> "RedisEventBus":
+        return cls(
+            Redis.from_url(url, decode_responses=True),
+            maxlen=maxlen,
+            ttl_seconds=ttl_seconds,
+        )
 
     @staticmethod
     def key(run_id: UUID) -> str:
@@ -95,11 +111,16 @@ class RedisEventBus:
         agent: str,
         data: Mapping[str, Any],
     ) -> str:
-        body = json.dumps(event_body(run_id, agent, data), separators=(",", ":"), default=str)
+        payload = event_body(run_id, agent, data)
+        body = json.dumps(payload, separators=(",", ":"), default=str)
         stored = await self._client.xadd(
             self.key(run_id),
             {"event": event_type, "data": body},
+            maxlen=self._maxlen,
+            approximate=True,
         )
+        if is_terminal(event_type, payload):
+            await self._client.expire(self.key(run_id), self._ttl_seconds)
         return _as_text(stored)
 
     async def read(self, run_id: UUID, after_id: str | None) -> list[EventRecord]:

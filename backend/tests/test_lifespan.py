@@ -32,15 +32,20 @@ def test_startup_fails_fast_without_required_env(monkeypatch: pytest.MonkeyPatch
     get_settings.cache_clear()
 
 
-def test_startup_succeeds_with_required_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def _configure(monkeypatch: pytest.MonkeyPatch, *, resume: str) -> None:
     for name, value in REQUIRED_ENV.items():
         monkeypatch.setenv(name, value)
-    get_settings.cache_clear()
+    monkeypatch.setenv("RESUME_ON_STARTUP", resume)
 
     async def no_seed() -> None:
         return None
 
     monkeypatch.setattr("app.main._seed_policies", no_seed)
+    get_settings.cache_clear()
+
+
+def test_startup_succeeds_with_required_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    _configure(monkeypatch, resume="false")
 
     try:
         with TestClient(app) as client:
@@ -50,3 +55,39 @@ def test_startup_succeeds_with_required_env(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_startup_resumes_runs_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    _configure(monkeypatch, resume="true")
+    calls: list[dict[str, object]] = []
+
+    async def fake_resume(**kwargs: object) -> None:
+        calls.append(kwargs)
+
+    monkeypatch.setattr("app.main.resume_unfinished_runs", fake_resume)
+
+    try:
+        with TestClient(app):
+            pass
+    finally:
+        get_settings.cache_clear()
+
+    assert len(calls) == 1
+
+
+def test_startup_skips_resume_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    _configure(monkeypatch, resume="false")
+    calls: list[dict[str, object]] = []
+
+    async def fake_resume(**kwargs: object) -> None:
+        calls.append(kwargs)
+
+    monkeypatch.setattr("app.main.resume_unfinished_runs", fake_resume)
+
+    try:
+        with TestClient(app):
+            pass
+    finally:
+        get_settings.cache_clear()
+
+    assert calls == []

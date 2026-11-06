@@ -32,6 +32,16 @@ async def list_for_campaign(session: AsyncSession, campaign_id: UUID) -> Sequenc
     return result.all()
 
 
+async def list_by_status(session: AsyncSession, status: RunStatus) -> Sequence[WorkflowRun]:
+    """Return runs in one lifecycle state, oldest first for deterministic resumes."""
+    result = await session.scalars(
+        select(WorkflowRun)
+        .where(WorkflowRun.status == status)
+        .order_by(WorkflowRun.created_at.asc(), WorkflowRun.id.asc())
+    )
+    return result.all()
+
+
 async def get_active(session: AsyncSession, campaign_id: UUID) -> WorkflowRun | None:
     """Return the newest run that has not reached a terminal status."""
     result = await session.scalars(

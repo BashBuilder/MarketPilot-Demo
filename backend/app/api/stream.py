@@ -19,7 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_event_bus, get_session
 from app.core.errors import NotFoundError
 from app.database.repositories import runs
-from app.events.bus import EventBus, EventRecord
+from app.events.bus import EventBus
+from app.events.envelope import EventRecord
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 

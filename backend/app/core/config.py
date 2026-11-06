@@ -8,7 +8,7 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-ImageProvider = Literal["fake", "flux", "sdxl"]
+ImageProvider = Literal["fake", "hosted", "local"]
 SearchProviderName = Literal["fake"]
 EmbedderName = Literal["fake", "huggingface"]
 
@@ -32,7 +32,14 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     database_url: str
     redis_url: str
+    event_stream_maxlen: int = Field(default=2000, ge=1)
+    event_stream_ttl_seconds: int = Field(default=86400, ge=1)
+    resume_on_startup: bool = True
     image_provider: ImageProvider = "fake"
+    image_api_url: str | None = None
+    image_api_key: SecretStr | None = None
+    image_model_id: str = Field(default="stabilityai/sdxl-turbo", min_length=1)
+    image_timeout_seconds: float = Field(default=120.0, gt=0)
     search_provider: SearchProviderName = "fake"
     embedder: EmbedderName = "fake"
     hf_embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", min_length=1)

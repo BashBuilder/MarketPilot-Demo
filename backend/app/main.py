@@ -31,9 +31,10 @@ from app.core.errors import (
 )
 from app.core.logging import configure_logging
 from app.database.seed import seed
-from app.database.session import session_scope
+from app.database.session import get_sessionmaker, session_scope
 from app.events.bus import RedisEventBus
 from app.events.emitter import make_emitter
+from app.runs.startup import resume_unfinished_runs
 
 logger = logging.getLogger(__name__)
 API_PREFIX = "/api/v1"
@@ -45,12 +46,25 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
     await _seed_policies()
-    bus = RedisEventBus.from_url(settings.redis_url)
+    bus = RedisEventBus.from_url(
+        settings.redis_url,
+        maxlen=settings.event_stream_maxlen,
+        ttl_seconds=settings.event_stream_ttl_seconds,
+    )
     application.state.event_bus = bus
     application.state.workflow_services = replace(
         DEFAULT_WORKFLOW_SERVICES,
         emit=make_emitter(bus),
     )
+    if settings.resume_on_startup:
+        try:
+            await resume_unfinished_runs(
+                session_factory=get_sessionmaker(),
+                launcher=application.state.run_launcher,
+                settings=settings,
+            )
+        except Exception:
+            logger.exception("startup run resume failed")
     try:
         yield
     finally:

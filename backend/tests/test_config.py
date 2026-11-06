@@ -30,6 +30,13 @@ def test_settings_load_from_environment(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("COST_CAP_PER_RUN", "3.5")
     monkeypatch.delenv("ASSET_DIR", raising=False)
     monkeypatch.delenv("SEARCH_PROVIDER", raising=False)
+    monkeypatch.delenv("EVENT_STREAM_MAXLEN", raising=False)
+    monkeypatch.delenv("EVENT_STREAM_TTL_SECONDS", raising=False)
+    monkeypatch.delenv("RESUME_ON_STARTUP", raising=False)
+    monkeypatch.delenv("IMAGE_PROVIDER", raising=False)
+    monkeypatch.delenv("IMAGE_API_URL", raising=False)
+    monkeypatch.delenv("IMAGE_MODEL_ID", raising=False)
+    monkeypatch.delenv("IMAGE_TIMEOUT_SECONDS", raising=False)
     monkeypatch.delenv("SCORE_THRESHOLD", raising=False)
     monkeypatch.delenv("MAX_AUTO_LOOPS", raising=False)
 
@@ -38,10 +45,16 @@ def test_settings_load_from_environment(monkeypatch: pytest.MonkeyPatch) -> None
     assert settings.deepseek_api_key.get_secret_value() == "test-key"
     assert settings.database_url.endswith("/marketpilot")
     assert settings.redis_url == "redis://localhost:6379/0"
+    assert settings.event_stream_maxlen == 2000
+    assert settings.event_stream_ttl_seconds == 86400
+    assert settings.resume_on_startup is True
     assert settings.asset_dir == Path("assets")
     assert settings.search_provider == "fake"
     assert settings.cost_cap_per_run == 3.5
     assert settings.image_provider == "fake"
+    assert settings.image_api_url is None
+    assert settings.image_model_id == "stabilityai/sdxl-turbo"
+    assert settings.image_timeout_seconds == 120.0
     assert settings.embedder == "fake"
     assert settings.hf_embedding_model == "sentence-transformers/all-MiniLM-L6-v2"
     assert settings.max_image_calls_per_run == 8
