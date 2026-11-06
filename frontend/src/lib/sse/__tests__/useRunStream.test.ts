@@ -50,7 +50,7 @@ describe("useRunStream", () => {
     expect(result.current.state.handoffs).toHaveLength(2);
   });
 
-  it("reconnects with the last event id after a drop", () => {
+  it("leaves an unexpected drop to the native EventSource reconnect", () => {
     const { result, source } = setup();
     act(() => {
       for (const event of scripted.slice(0, 3)) source.emitEvent(event);
@@ -58,26 +58,56 @@ describe("useRunStream", () => {
     expect(result.current.state.lastEventId).toBe("3");
 
     act(() => source.fail());
-    expect(source.closed).toBe(true);
+    expect(source.closed).toBe(false);
     expect(result.current.status).toBe("reconnecting");
+
+    // The browser reopens the same EventSource and sends Last-Event-ID itself,
+    // so the client must not create a second connection.
+    act(() => vi.advanceTimersByTime(60_000));
     expect(FakeEventSource.instances).toHaveLength(1);
 
-    act(() => vi.advanceTimersByTime(1000));
-    expect(FakeEventSource.instances).toHaveLength(2);
-    const resumed = FakeEventSource.instances[1];
-    expect(resumed.url).toBe(
-      `${API_BASE_URL}/runs/${runId}/stream?last_event_id=3`,
-    );
+    act(() => source.open());
+    expect(result.current.status).toBe("open");
 
     act(() => {
-      resumed.open();
-      for (const event of scripted) resumed.emitEvent(event);
+      // A replay includes the events already seen; deduplication keeps them
+      // from being applied twice.
+      for (const event of scripted) source.emitEvent(event);
     });
-    // The replay ends at the approval gate, so the resumed stream closes.
+    // The replay ends at the approval gate, so the stream closes.
     expect(result.current.status).toBe("closed");
-    expect(resumed.closed).toBe(true);
+    expect(source.closed).toBe(true);
     expect(result.current.state.lastEventId).toBe("20");
     expect(result.current.state.toolCalls).toHaveLength(4);
     expect(result.current.state.handoffs).toHaveLength(6);
+  });
+
+  it("flags a silent open stream, then clears the flag on activity", () => {
+    const { result } = renderHook(() =>
+      useRunStream(runId, { stallAfterMs: 5_000 }),
+    );
+    const source = FakeEventSource.instances[0];
+    act(() => source.open());
+
+    act(() => vi.advanceTimersByTime(4_999));
+    expect(result.current.stalled).toBe(false);
+
+    act(() => vi.advanceTimersByTime(1));
+    expect(result.current.stalled).toBe(true);
+
+    act(() => source.emitEvent(scripted[0]));
+    expect(result.current.stalled).toBe(false);
+
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(result.current.stalled).toBe(true);
+
+    // A reconnect pauses the stall timer and a native reopen starts it again.
+    act(() => source.fail());
+    expect(result.current.stalled).toBe(false);
+    expect(result.current.status).toBe("reconnecting");
+
+    act(() => source.open());
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(result.current.stalled).toBe(true);
   });
 });

@@ -101,6 +101,33 @@ describe("campaign package schemas", () => {
     expect(campaignPackage.safeParse(haircarePackage).success).toBe(true);
   });
 
+  it("parses a partially produced package with null sections", () => {
+    const partial = {
+      ...haircarePackage,
+      brief: null,
+      copy: null,
+      direction: null,
+      assets: null,
+      compliance: null,
+      score: null,
+    };
+    expect(campaignPackage.safeParse(partial).success).toBe(true);
+  });
+
+  it("parses a partially produced package with omitted sections", () => {
+    const partial = { ...haircarePackage } as Partial<typeof haircarePackage>;
+    delete partial.brief;
+    delete partial.score;
+    expect(campaignPackage.safeParse(partial).success).toBe(true);
+  });
+
+  it("accepts backend image seeds above the JavaScript safe integer range", () => {
+    const seed = 12_121_485_059_587_893_276;
+    expect(
+      asset.safeParse({ ...haircarePackage.assets.assets[0], seed }).success,
+    ).toBe(true);
+  });
+
   it("keeps failed compliance items in the package shape", () => {
     const compliance = {
       items: [{ check: "Guaranteed repair", passed: false, reason: "Absolute claim." }],

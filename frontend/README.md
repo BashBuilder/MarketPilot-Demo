@@ -24,6 +24,15 @@ On PowerShell use `Copy-Item .env.example .env.local`. Set
 `http://localhost:8000/api/v1`. Only `NEXT_PUBLIC_*` values reach the browser;
 never put secrets in them.
 
+The backend returns generated images as paths relative to its asset directory,
+not as HTTP URLs. Set the server-only `BACKEND_ASSET_DIR` to that directory so
+the same-origin `/api/assets` proxy can display previews. Use a shared volume in
+Docker, or point it at the backend checkout during local development:
+
+```bash
+BACKEND_ASSET_DIR=../MarketPilot-Backend/backend/assets
+```
+
 ## Scripts
 
 | Script | Purpose |

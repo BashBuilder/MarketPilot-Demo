@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ImageOff } from "lucide-react";
 import { EmptyState } from "@/components/states/empty-state";
+import { resolveAssetUrl } from "@/lib/assets/asset-url";
 import type { Asset, CreativeDirection } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 
@@ -99,7 +100,7 @@ export function AssetGrid({ assets, direction, className }: AssetGridProps) {
                   ) : (
                     /* eslint-disable-next-line @next/next/no-img-element -- asset hosts are backend-provided at runtime */
                     <img
-                      src={asset.uri}
+                      src={resolveAssetUrl(asset.uri)}
                       alt={alt}
                       loading="lazy"
                       decoding="async"

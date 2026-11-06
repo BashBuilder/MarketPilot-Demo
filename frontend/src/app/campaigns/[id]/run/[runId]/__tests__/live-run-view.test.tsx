@@ -6,8 +6,14 @@ import { LiveRunView } from "../live-run-view";
 
 const scripted = buildScriptedRun(runId);
 
-function setup() {
-  const view = render(<LiveRunView campaignId={campaignId} runId={runId} />);
+function setup(stallAfterMs?: number) {
+  const view = render(
+    <LiveRunView
+      campaignId={campaignId}
+      runId={runId}
+      stallAfterMs={stallAfterMs}
+    />,
+  );
   const source = FakeEventSource.instances[0];
   if (!source) {
     throw new Error("The live view did not open an EventSource");
@@ -80,6 +86,32 @@ describe("LiveRunView", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Reconnecting to the live stream…",
     );
+  });
+
+  it("shows a bounded no-progress state for a silent open stream", () => {
+    vi.useFakeTimers();
+    setup(5_000);
+
+    expect(screen.queryByText("No progress yet")).not.toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(5_000));
+
+    const notice = screen.getByRole("status");
+    expect(notice).toHaveTextContent("No progress yet");
+    expect(
+      within(notice).getByRole("button", { name: "Reload run" }),
+    ).toBeInTheDocument();
+  });
+
+  it("clears the no-progress state when the stream sends an event", () => {
+    vi.useFakeTimers();
+    const { source } = setup(5_000);
+
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(screen.getByText("No progress yet")).toBeInTheDocument();
+
+    act(() => source.emitEvent(scripted[0]));
+    expect(screen.queryByText("No progress yet")).not.toBeInTheDocument();
   });
 
   it("surfaces a fatal stream error in the ErrorState", () => {

@@ -1,90 +1,89 @@
-import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Inbox } from "lucide-react";
-import { CampaignCard } from "@/components/campaign/CampaignCard";
-import { EmptyState } from "@/components/states/empty-state";
-import { RetryErrorState } from "@/components/states/retry-error-state";
+import { ArrowRight } from "lucide-react";
+import { LandingClosing } from "@/components/landing/landing-closing";
+import { LandingHighlights } from "@/components/landing/landing-highlights";
+import { PipelinePreview } from "@/components/landing/pipeline-preview";
 import { buttonVariants } from "@/components/ui/button";
-import { ApiError, listCampaigns } from "@/lib/api";
-import type { CampaignSummary } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 
-export const instant = false;
+export const metadata: Metadata = {
+  title: "Autonomous advertising campaigns",
+  description:
+    "Describe a product and an audience. MarketPilot's agents research, write, design and check the campaign, then you approve it.",
+};
 
-function newestFirst(campaigns: readonly CampaignSummary[]): CampaignSummary[] {
-  return [...campaigns].sort((a, b) => {
-    const byCreated = Date.parse(b.created_at) - Date.parse(a.created_at);
-    if (byCreated !== 0) return byCreated;
-    return Date.parse(b.updated_at) - Date.parse(a.updated_at);
-  });
-}
-
-function CampaignListEmpty() {
+export default function LandingPage() {
   return (
-    <EmptyState
-      title="No campaigns yet"
-      description="Describe a product and audience, and the agents will build the first campaign package."
-      icon={<Inbox />}
-      action={
-        <Link href="/campaigns/new" className={buttonVariants({ size: "lg" })}>
-          New campaign
-        </Link>
-      }
-    />
-  );
-}
+    <div className="relative isolate flex flex-col gap-section">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 -top-xl -z-10 h-[28rem] overflow-hidden"
+      >
+        <div className="absolute top-0 left-1/2 size-[36rem] -translate-x-1/2 rounded-full bg-accent/50 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--color-border)_1px,transparent_1px)] [background-size:24px_24px] opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+      </div>
 
-type LoadResult =
-  | { ok: true; campaigns: CampaignSummary[] }
-  | { ok: false; error: unknown };
+      <section
+        aria-labelledby="landing-heading"
+        className="grid items-center gap-xl lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-2xl"
+      >
+        <div className="flex max-w-[42rem] flex-col items-start gap-md">
+          <p className="inline-flex items-center gap-xs rounded-full border border-border bg-background/80 px-sm py-1 text-2xs font-medium tracking-wider text-muted-foreground uppercase backdrop-blur-sm">
+            <span
+              aria-hidden="true"
+              className="size-1.5 rounded-full bg-brand"
+            />
+            Autonomous creative pipeline
+          </p>
 
-async function loadCampaigns(): Promise<LoadResult> {
-  try {
-    return { ok: true, campaigns: await listCampaigns() };
-  } catch (error) {
-    return { ok: false, error };
-  }
-}
+          <h1
+            id="landing-heading"
+            className="text-display font-semibold text-balance tracking-tight"
+          >
+            Campaigns, composed by a{" "}
+            <span className="text-brand">team of agents.</span>
+          </h1>
 
-export default async function HomePage() {
-  const result = await loadCampaigns();
+          <p className="max-w-[36rem] text-lg text-pretty text-muted-foreground">
+            Describe a product and an audience. MarketPilot researches the
+            market, writes channel-ready copy, designs the visuals and checks
+            every claim — then hands the package to you.
+          </p>
 
-  let content: ReactNode;
-  if (!result.ok) {
-    content = (
-      <RetryErrorState
-        title="Could not load campaigns"
-        description={
-          result.error instanceof ApiError
-            ? result.error.message
-            : "An unexpected error occurred while loading campaigns."
-        }
-      />
-    );
-  } else if (result.campaigns.length === 0) {
-    content = <CampaignListEmpty />;
-  } else {
-    content = (
-      <ul aria-label="Campaigns" className="grid gap-sm sm:grid-cols-2">
-        {newestFirst(result.campaigns).map((campaign) => (
-          <CampaignCard key={campaign.id} campaign={campaign} />
-        ))}
-      </ul>
-    );
-  }
+          <div className="mt-xs flex flex-col gap-sm sm:flex-row sm:items-center">
+            <Link
+              href="/campaigns"
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "h-11 px-lg text-base",
+              )}
+            >
+              Open campaigns
+              <ArrowRight aria-hidden="true" />
+            </Link>
+            <Link
+              href="/campaigns/new"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "h-11 border-input px-lg text-base",
+              )}
+            >
+              Start a campaign
+            </Link>
+          </div>
 
-  return (
-    <div className="mx-auto flex w-full max-w-[64rem] flex-col gap-lg">
-      <header className="flex flex-col gap-2xs">
-        <p className="text-2xs font-medium tracking-wider text-muted-foreground uppercase">
-          Workspace
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Campaigns</h1>
-        <p className="max-w-prose text-sm text-muted-foreground">
-          Review the campaigns the agents have built, newest first.
-        </p>
-      </header>
+          <p className="text-xs text-muted-foreground">
+            No setup. Reviewers stay in control of every launch.
+          </p>
+        </div>
 
-      {content}
+        <PipelinePreview />
+      </section>
+
+      <LandingHighlights />
+
+      <LandingClosing />
     </div>
   );
 }

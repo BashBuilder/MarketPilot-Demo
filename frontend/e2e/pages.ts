@@ -11,8 +11,13 @@ export interface AppPage {
 
 export const appPages: readonly AppPage[] = [
   {
-    name: "campaign list",
+    name: "landing",
     path: "/",
+    heading: "Campaigns, composed by a team of agents.",
+  },
+  {
+    name: "campaign list",
+    path: "/campaigns",
     heading: "Campaigns",
   },
   {

@@ -11,6 +11,7 @@ import {
   it,
   vi,
 } from "vitest";
+import type { CampaignPackage } from "@/lib/schemas";
 import { campaignId, haircarePackage } from "@/mocks/fixtures";
 import { haircareDirection } from "@/mocks/fixtures/package-visuals";
 import { handlers } from "@/mocks/handlers";
@@ -41,7 +42,7 @@ async function renderVersionPage(n = "1") {
   return render(page);
 }
 
-function overrideVersion(packageData: typeof haircarePackage) {
+function overrideVersion(packageData: CampaignPackage) {
   server.use(
     http.get("*/api/v1/campaigns/:id/versions/:version", () =>
       HttpResponse.json(packageData),
@@ -75,6 +76,37 @@ describe("VersionPage", () => {
     expect(
       screen.getByRole("region", { name: "Version 1 is ready for review" }),
     ).toBeInTheDocument();
+  });
+
+  it("renders not-produced states for a partially produced version", async () => {
+    overrideVersion({
+      ...haircarePackage,
+      brief: null,
+      research: null,
+      copy: null,
+      direction: null,
+      assets: null,
+      compliance: null,
+      score: null,
+    });
+
+    await renderVersionPage();
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Version 1" }),
+    ).toBeInTheDocument();
+    for (const title of [
+      "No brief yet",
+      "No research yet",
+      "No copy yet",
+      "No creative direction yet",
+      "No assets yet",
+      "No compliance report yet",
+      "No score yet",
+    ]) {
+      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("surfaces a failed compliance item", async () => {

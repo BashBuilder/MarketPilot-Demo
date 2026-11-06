@@ -3,7 +3,6 @@
 import logging
 from collections.abc import AsyncIterator, Collection, Iterator
 from contextlib import asynccontextmanager
-from dataclasses import replace
 from typing import Any, cast
 
 from fastapi import APIRouter, FastAPI, Request
@@ -17,6 +16,7 @@ from app.api.dependencies import (
     DEFAULT_EVENT_BUS,
     DEFAULT_WORKFLOW_SERVICES,
     RecordingRunLauncher,
+    WorkflowServices,
 )
 from app.api.limits import RateLimitClient, RedisRateLimiter
 from app.api.runs import router as runs_router
@@ -38,6 +38,9 @@ from app.database.seed import seed
 from app.database.session import get_sessionmaker, session_scope
 from app.events.bus import RedisEventBus
 from app.events.emitter import make_emitter
+from app.llm.deepseek import DeepSeekLLMClient
+from app.runs.launcher import WorkflowRunLauncher
+from app.runs.services import build_agents, build_tool_registry
 from app.runs.startup import resume_unfinished_runs
 
 logger = logging.getLogger(__name__)
@@ -56,11 +59,28 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         ttl_seconds=settings.event_stream_ttl_seconds,
     )
     rate_client = Redis.from_url(settings.redis_url, decode_responses=True)
+    session_factory = get_sessionmaker()
+    agents = build_agents()
+    llm = DeepSeekLLMClient(settings)
+    registry = build_tool_registry(settings, session_factory)
+    launcher = WorkflowRunLauncher(
+        agents=agents,
+        llm=llm,
+        registry=registry,
+        session_factory=session_factory,
+        event_bus=bus,
+        settings=settings,
+    )
     application.state.event_bus = bus
     application.state.rate_limiter = RedisRateLimiter(cast(RateLimitClient, rate_client))
-    application.state.workflow_services = replace(
-        DEFAULT_WORKFLOW_SERVICES,
+    application.state.run_launcher = launcher
+    application.state.workflow_services = WorkflowServices(
+        agents=agents,
+        llm=llm,
+        tools={},
         emit=make_emitter(bus),
+        registry=registry,
+        session_factory=session_factory,
     )
     if settings.resume_on_startup:
         try:
@@ -74,6 +94,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await launcher.close()
         await bus.close()
         await rate_client.aclose()
 

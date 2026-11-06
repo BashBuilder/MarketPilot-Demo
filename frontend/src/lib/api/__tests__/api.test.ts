@@ -47,8 +47,8 @@ describe("API client against the mock API", () => {
 
   it("reads a full version package", async () => {
     const version = await getVersion(campaignId, 1);
-    expect(version.score.total).toBe(86);
-    expect(version.copy.variants[0].channel).toBe("instagram");
+    expect(version.score?.total).toBe(86);
+    expect(version.copy?.variants[0].channel).toBe("instagram");
   });
 
   it("approves a run", async () => {
@@ -69,7 +69,7 @@ describe("API client against the mock API", () => {
     expect(versions[1].parent_version_id).not.toBeNull();
 
     const version = await getVersion(campaignId, 2);
-    expect(version.copy.variants[0].headline).toContain("commute");
+    expect(version.copy?.variants[0].headline).toContain("commute");
 
     const diff = await getVersionDiff(campaignId, 1, 2);
     expect(diff.changes.length).toBeGreaterThan(0);

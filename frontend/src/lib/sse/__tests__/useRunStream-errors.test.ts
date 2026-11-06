@@ -51,12 +51,14 @@ describe("useRunStream cleanup", () => {
     expect(source.closed).toBe(true);
   });
 
-  it("cancels a pending reconnect on unmount", () => {
+  it("leaves the dropped stream to the browser and closes it on unmount", () => {
     const { result, source, unmount } = setup();
     act(() => source.fail());
     expect(result.current.status).toBe("reconnecting");
+    expect(source.closed).toBe(false);
 
     unmount();
+    expect(source.closed).toBe(true);
     act(() => vi.advanceTimersByTime(60_000));
     expect(FakeEventSource.instances).toHaveLength(1);
   });

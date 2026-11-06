@@ -98,7 +98,7 @@ describe("CampaignPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Back to campaigns" }),
-    ).toHaveAttribute("href", "/");
+    ).toHaveAttribute("href", "/campaigns");
   });
 
 });

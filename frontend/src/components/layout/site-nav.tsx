@@ -7,12 +7,17 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Campaigns", primary: false },
+  { href: "/campaigns", label: "Campaigns", primary: false },
   { href: "/campaigns/new", label: "New campaign", primary: true },
 ] as const;
 
 function isActivePath(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
+  if (href === "/campaigns") {
+    return (
+      pathname === href ||
+      (pathname.startsWith(`${href}/`) && pathname !== "/campaigns/new")
+    );
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

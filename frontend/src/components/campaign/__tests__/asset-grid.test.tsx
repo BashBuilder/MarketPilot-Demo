@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import { resolveAssetUrl } from "@/lib/assets/asset-url";
 import { haircarePackage } from "@/mocks/fixtures";
 import { haircareDirection } from "@/mocks/fixtures/package-visuals";
 import { AssetGrid } from "../AssetGrid";
@@ -14,7 +15,7 @@ describe("AssetGrid", () => {
 
     const image = screen.getByRole("img", { name: firstAlt });
 
-    expect(image).toHaveAttribute("src", assets[0].uri);
+    expect(image).toHaveAttribute("src", resolveAssetUrl(assets[0].uri));
     expect(
       screen.getByRole("heading", { level: 2, name: "Campaign assets" }),
     ).toBeInTheDocument();

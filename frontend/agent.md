@@ -31,8 +31,9 @@ frontend/
   src/
     app/
       layout.tsx
-      page.tsx                      campaign list and new campaign entry
+      page.tsx                      landing page
       campaigns/
+        page.tsx                    campaign list
         new/page.tsx                idea submission
         [id]/
           page.tsx                  campaign overview (latest version)
@@ -104,16 +105,22 @@ Base path `/api/v1`, configured through `NEXT_PUBLIC_API_URL`. All bodies are JS
 - The `id` of each SSE event is opaque and increasing; clients send the last one back as `Last-Event-ID`.
 - The server closes the stream after a terminal event: `awaiting_approval`, `completed`, or `error` with `recoverable: false`.
 - Clients must not reconnect after a terminal event. They reconnect only after an unexpected drop.
+- On an unexpected drop the client leaves the `EventSource` open so the browser reconnects natively and sends `Last-Event-ID` automatically. It must not close and reopen with a query parameter, and it must not create a second connection.
+- An open stream that stays silent for a generous window (default 75s) shows a bounded no-progress state with a reload action. A slow model call is not an error.
 
 **Package shape (per version):**
 
-- `brief`: `{ product, goal, audience, tone, channels, constraints }`
-- `research`: `{ segments, pain_points, messaging_angles, sources }`, sources are `{ title, url }`
-- `copy`: `{ variants }`, each variant is `{ channel, headline, description, cta }`
-- `direction`: `{ style_guide, composition, image_prompts, video_prompts, negative_prompts }`
-- `assets`: `{ assets }`, each asset is `{ uri, checksum, model, seed, prompt }`
-- `compliance`: `{ items }`, each item is `{ check, passed, reason }`
-- `score`: five dimensions (`brief_alignment`, `audience_fit`, `copy_quality`, `visual_quality`, `compliance_risk`), each `{ score, justification }`, plus `total`
+A version may be snapshotted at the human gate before every agent finishes. The backend serializes it with `response_model_exclude_none`, so an unproduced section arrives either as `null` or omitted entirely. The UI must render an explicit per-section "not produced" state in both cases; it must not reject the whole package or drop the field.
+
+- `brief`: `{ product, goal, audience, tone, channels, constraints } | null`
+- `research`: `{ segments, pain_points, messaging_angles, sources } | null`, sources are `{ title, url }`
+- `copy`: `{ variants } | null`, each variant is `{ channel, headline, description, cta }`
+- `direction`: `{ style_guide, composition, image_prompts, video_prompts, negative_prompts } | null`
+- `assets`: `{ assets } | null`, each asset is `{ uri, checksum, model, seed, prompt }`
+- `compliance`: `{ items } | null`, each item is `{ check, passed, reason }`
+- `score`: five dimensions (`brief_alignment`, `audience_fit`, `copy_quality`, `visual_quality`, `compliance_risk`), each `{ score, justification }`, plus `total`; the whole score is `null` until the Reviewer produces it
+
+Asset `seed` is a 64-bit integer and may exceed `Number.MAX_SAFE_INTEGER`. JSON clients receive an imprecise `Number`, so validate it as a non-negative integer without enforcing the safe-integer cap; never reject the package because of a large seed.
 
 **Errors:** `{ error: { code, message, details? } }` with the matching HTTP status.
 
@@ -140,6 +147,7 @@ The UI mirrors the backend pipeline. Each agent has a clear visual identity (nam
 - Show handoffs between agents as they arrive (`agent_handoff`).
 - Show tool calls compactly (tool name, duration, status) and expandable for details.
 - Show validation failures and retries honestly, including attempt counts. Do not hide failures.
+- When the stream is open but silent, show the bounded no-progress state instead of an indefinite "waiting" message. A slow model call is not a failure.
 - At `awaiting_approval`, the approval panel becomes the focus of the page.
 
 **Review screen must show:** brief, audience research, copy variants per channel, image assets with prompt, model and seed on demand, the compliance report (pass/fail per item with reason), and the creative score with per-dimension breakdown and justification.
@@ -161,9 +169,9 @@ The frontend only does what a signed-in user is allowed to do through the API.
 
 - Server state (campaigns, versions) comes from the API; do not duplicate it in global client stores. Use a small query layer with caching and invalidation after mutations (approve, revise).
 - Live run state is derived from the SSE event stream with a reducer; it is a pure function of the ordered events so it can be replayed in tests.
-- The SSE hook must handle: connection drop, automatic reconnect with `Last-Event-ID`, duplicate events (dedupe by event id), and cleanup on unmount.
+- The SSE hook must handle: connection drop, native reconnect with `Last-Event-ID` (no manual close and reopen), duplicate events (dedupe by event id), a bounded stall/no-progress state, and cleanup on unmount.
 - Never store anything sensitive in `localStorage`. Only UI preferences may be persisted there.
-- Images are loaded from backend asset URIs; always provide `alt` text from the creative direction and a fallback state if an image fails to load.
+- Images are loaded from backend asset URIs. Absolute web URLs load directly; backend-relative file names go through the same-origin `/api/assets` proxy, which reads the directory configured by the server-only `BACKEND_ASSET_DIR`. Always provide `alt` text from the creative direction and a fallback state if an image fails to load.
 
 ---
 
@@ -227,7 +235,7 @@ Work strictly in order. Each step: goal, tasks, done when.
 ### Step 3: SSE hook and run reducer
 
 - `lib/sse` hook with reconnect, `Last-Event-ID`, dedupe and cleanup. Pure reducer turning ordered events into run state.
-- **Done when:** tests cover ordering, duplicates, reconnect, malformed events and cleanup.
+- **Done when:** tests cover ordering, duplicates, native reconnect, the bounded stall state, malformed events and cleanup.
 
 ### Step 4: New campaign flow
 
@@ -242,7 +250,7 @@ Work strictly in order. Each step: goal, tasks, done when.
 ### Step 6: Review screen
 
 - Cards for brief, research, copy variants, image assets (with prompt, model and seed on demand), compliance report, and the score breakdown chart with justifications.
-- **Done when:** every section renders from a fixture package, including failed compliance items and missing images.
+- **Done when:** every section renders from a fixture package, including failed compliance items, missing images, and `null` sections from a partially produced version.
 
 ### Step 7: Approval and revision
 

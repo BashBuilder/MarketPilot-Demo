@@ -7,13 +7,17 @@ import { RunApprovalPrompt } from "@/components/agents/RunApprovalPrompt";
 import { RunFailureList } from "@/components/agents/RunFailureList";
 import { ToolCallFeed } from "@/components/agents/ToolCallFeed";
 import { agentLabel } from "@/components/agents/agent-meta";
+import { EmptyState } from "@/components/states/empty-state";
 import { ErrorState } from "@/components/states/error-state";
+import { Button } from "@/components/ui/button";
 import type { RunStatus } from "@/lib/sse/run-state";
 import { useRunStream } from "@/lib/sse/useRunStream";
 
 interface LiveRunViewProps {
   campaignId: string;
   runId: string;
+  /** Optional override for tests; production uses the stream default. */
+  stallAfterMs?: number;
 }
 
 const HEADLINES: Record<RunStatus, string> = {
@@ -24,8 +28,12 @@ const HEADLINES: Record<RunStatus, string> = {
   failed: "Run ended with an error",
 };
 
-export function LiveRunView({ campaignId, runId }: LiveRunViewProps) {
-  const { state, status } = useRunStream(runId);
+export function LiveRunView({
+  campaignId,
+  runId,
+  stallAfterMs,
+}: LiveRunViewProps) {
+  const { state, status, stalled } = useRunStream(runId, { stallAfterMs });
   const connecting = status === "connecting" || status === "reconnecting";
   const fatalErrors = state.errors.filter((error) => !error.recoverable);
 
@@ -63,6 +71,25 @@ export function LiveRunView({ campaignId, runId }: LiveRunViewProps) {
             ? "Reconnecting to the live stream…"
             : "Connecting to the live stream…"}
         </p>
+      ) : null}
+
+      {stalled ? (
+        <div role="status">
+          <EmptyState
+            title="No progress yet"
+            description="The run is connected but has not sent an update for a while. Long model calls can stay quiet, so this is not treated as a failure. Reload to check the latest state."
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.reload()}
+              >
+                Reload run
+              </Button>
+            }
+          />
+        </div>
       ) : null}
 
       {fatalErrors.length > 0 || state.status === "failed" ? (
