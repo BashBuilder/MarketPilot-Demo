@@ -6,7 +6,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.capacity import ensure_run_capacity
 from app.api.dependencies import RunLauncher, get_run_launcher, get_session
+from app.api.limits import enforce_read_limit, enforce_write_limit
 from app.api.schemas import CampaignCreated, CampaignSummary, CreateCampaignRequest
 from app.core.config import Settings, get_settings
 from app.core.errors import NotFoundError, ValidationFailure
@@ -16,7 +18,12 @@ from app.database.repositories import campaigns, runs, versions
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 
-@router.post("", response_model=CampaignCreated, status_code=201)
+@router.post(
+    "",
+    response_model=CampaignCreated,
+    status_code=201,
+    dependencies=[Depends(enforce_write_limit)],
+)
 async def create_campaign(
     payload: CreateCampaignRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -25,6 +32,7 @@ async def create_campaign(
 ) -> CampaignCreated:
     """Create the campaign and its first run, then launch the run."""
     idea = _validated_idea(payload.idea, settings.max_idea_length)
+    await ensure_run_capacity(session, settings)
     campaign = await campaigns.create(session, idea=idea)
     run = await runs.create(session, campaign_id=campaign.id)
     # Commit before launching so the runner can read the row immediately.
@@ -33,7 +41,11 @@ async def create_campaign(
     return CampaignCreated(campaign_id=campaign.id, run_id=run.id)
 
 
-@router.get("", response_model=list[CampaignSummary])
+@router.get(
+    "",
+    response_model=list[CampaignSummary],
+    dependencies=[Depends(enforce_read_limit)],
+)
 async def list_campaigns(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[CampaignSummary]:
@@ -42,7 +54,11 @@ async def list_campaigns(
     return [await _summary(session, campaign) for campaign in rows]
 
 
-@router.get("/{campaign_id}", response_model=CampaignSummary)
+@router.get(
+    "/{campaign_id}",
+    response_model=CampaignSummary,
+    dependencies=[Depends(enforce_read_limit)],
+)
 async def get_campaign(
     campaign_id: UUID,
     session: Annotated[AsyncSession, Depends(get_session)],

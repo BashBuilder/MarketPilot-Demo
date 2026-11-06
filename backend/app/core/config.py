@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     score_threshold: int = Field(default=70, ge=0, le=100)
     max_auto_loops: int = Field(default=2, ge=0)
     max_idea_length: int = Field(default=2000, ge=1)
+    max_comment_length: int = Field(default=2000, ge=1)
+    rate_limit_per_minute: int = Field(default=20, ge=1)
+    max_concurrent_runs: int = Field(default=3, ge=1)
+    trust_proxy: bool = False
     frontend_origin: str = "http://localhost:3000"
     log_level: LogLevel = "INFO"
 

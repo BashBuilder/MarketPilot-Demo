@@ -68,6 +68,28 @@ class InvalidRunState(MarketPilotError):
     code = "invalid_run_state"
 
 
+class RateLimited(MarketPilotError):
+    """A client exceeded its request budget for the current window."""
+
+    code = "rate_limited"
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        retry_after: int,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message, details=details)
+        self.retry_after = max(1, retry_after)
+
+
+class TooManyRuns(MarketPilotError):
+    """The concurrent-run cap is full, so no new run may start."""
+
+    code = "too_many_runs"
+
+
 class NotFoundError(MarketPilotError):
     """A requested campaign, run, version or asset does not exist."""
 

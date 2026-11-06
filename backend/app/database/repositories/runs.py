@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import RunStatus, WorkflowRun
@@ -20,6 +20,14 @@ async def create(session: AsyncSession, *, campaign_id: UUID) -> WorkflowRun:
 
 async def get(session: AsyncSession, run_id: UUID) -> WorkflowRun | None:
     return await session.get(WorkflowRun, run_id)
+
+
+async def count_running(session: AsyncSession) -> int:
+    """Count runs that are actively executing against the shared worker pool."""
+    total = await session.scalar(
+        select(func.count()).select_from(WorkflowRun).where(WorkflowRun.status == RunStatus.RUNNING)
+    )
+    return int(total or 0)
 
 
 async def list_for_campaign(session: AsyncSession, campaign_id: UUID) -> Sequence[WorkflowRun]:

@@ -4,11 +4,12 @@ import logging
 from collections.abc import AsyncIterator, Collection, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import replace
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from redis.asyncio import Redis
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api.campaigns import router as campaigns_router
@@ -17,6 +18,7 @@ from app.api.dependencies import (
     DEFAULT_WORKFLOW_SERVICES,
     RecordingRunLauncher,
 )
+from app.api.limits import RateLimitClient, RedisRateLimiter
 from app.api.runs import router as runs_router
 from app.api.schemas import ErrorDetail, ErrorResponse
 from app.api.stream import router as stream_router
@@ -27,6 +29,8 @@ from app.core.errors import (
     InvalidRunState,
     MarketPilotError,
     NotFoundError,
+    RateLimited,
+    TooManyRuns,
     ValidationFailure,
 )
 from app.core.logging import configure_logging
@@ -51,7 +55,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         maxlen=settings.event_stream_maxlen,
         ttl_seconds=settings.event_stream_ttl_seconds,
     )
+    rate_client = Redis.from_url(settings.redis_url, decode_responses=True)
     application.state.event_bus = bus
+    application.state.rate_limiter = RedisRateLimiter(cast(RateLimitClient, rate_client))
     application.state.workflow_services = replace(
         DEFAULT_WORKFLOW_SERVICES,
         emit=make_emitter(bus),
@@ -69,6 +75,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await bus.close()
+        await rate_client.aclose()
 
 
 async def _seed_policies() -> None:
@@ -98,6 +105,8 @@ async def health() -> dict[str, str]:
 
 
 def _status_for(exc: MarketPilotError) -> int:
+    if isinstance(exc, (RateLimited, TooManyRuns)):
+        return 429
     if isinstance(exc, ValidationFailure):
         return 422
     if isinstance(exc, GuardrailViolation):
@@ -114,17 +123,20 @@ def _error_response(
     code: str,
     message: str,
     details: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     body = ErrorResponse(error=ErrorDetail(code=code, message=message, details=details))
     return JSONResponse(
         status_code=status_code,
         content=body.model_dump(mode="json", exclude_none=True),
+        headers=headers,
     )
 
 
 app = FastAPI(title="MarketPilot API", version="0.1.0", lifespan=lifespan)
 app.state.run_launcher = RecordingRunLauncher()
 app.state.event_bus = DEFAULT_EVENT_BUS
+app.state.rate_limiter = None
 app.state.workflow_services = DEFAULT_WORKFLOW_SERVICES
 app.add_middleware(
     CORSMiddleware,
@@ -150,7 +162,8 @@ async def handle_marketpilot_error(_: Request, exc: MarketPilotError) -> JSONRes
     if status_code == 500:
         logger.error("typed API error", extra={"code": exc.code})
         return _error_response(500, "internal_error", "Internal server error")
-    return _error_response(status_code, exc.code, exc.message, exc.details)
+    headers = {"Retry-After": str(exc.retry_after)} if isinstance(exc, RateLimited) else None
+    return _error_response(status_code, exc.code, exc.message, exc.details, headers)
 
 
 @app.exception_handler(RequestValidationError)

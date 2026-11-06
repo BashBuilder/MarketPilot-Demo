@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_event_bus, get_session
+from app.api.limits import enforce_read_limit
 from app.core.errors import NotFoundError
 from app.database.repositories import runs
 from app.events.bus import EventBus
@@ -29,7 +30,10 @@ POLL_SECONDS = 0.1
 _TERMINAL_EVENTS = frozenset({"awaiting_approval", "completed"})
 
 
-@router.get("/{run_id}/stream")
+@router.get(
+    "/{run_id}/stream",
+    dependencies=[Depends(enforce_read_limit)],
+)
 async def stream_run(
     run_id: UUID,
     session: Annotated[AsyncSession, Depends(get_session)],

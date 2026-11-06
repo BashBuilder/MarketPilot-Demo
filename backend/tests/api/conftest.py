@@ -6,6 +6,7 @@ from dataclasses import replace
 import pytest
 from api_support import FRONTEND_ORIGIN, MAX_IDEA_LENGTH
 from httpx import ASGITransport, AsyncClient
+from limits_support import make_rate_limiter
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -15,6 +16,7 @@ from app.api.dependencies import (
     get_run_launcher,
     get_session,
 )
+from app.api.limits import RedisRateLimiter
 from app.core.config import get_settings
 from app.database.models import Base
 from app.events.bus import InMemoryEventBus
@@ -69,9 +71,16 @@ def launcher() -> RecordingRunLauncher:
 
 
 @pytest.fixture()
+def rate_limiter() -> RedisRateLimiter:
+    """Give every test its own counters so limits never leak across tests."""
+    return make_rate_limiter()
+
+
+@pytest.fixture()
 async def client(
     session_factory: async_sessionmaker[AsyncSession],
     launcher: RecordingRunLauncher,
+    rate_limiter: RedisRateLimiter,
 ) -> AsyncIterator[AsyncClient]:
     async def _session_override() -> AsyncIterator[AsyncSession]:
         async with session_factory() as session:
@@ -84,9 +93,14 @@ async def client(
 
     app.dependency_overrides[get_session] = _session_override
     app.dependency_overrides[get_run_launcher] = lambda: launcher
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-    ) as client:
-        yield client
-    app.dependency_overrides.clear()
+    previous_limiter = app.state.rate_limiter
+    app.state.rate_limiter = rate_limiter
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            yield client
+    finally:
+        app.state.rate_limiter = previous_limiter
+        app.dependency_overrides.clear()

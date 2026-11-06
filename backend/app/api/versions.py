@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_session
+from app.api.limits import enforce_read_limit
 from app.api.schemas import CampaignPackage, VersionDiff, VersionSummary
 from app.core.errors import NotFoundError
 from app.database.models import Campaign, CampaignVersion
@@ -16,7 +17,11 @@ from app.graph.diff import compute_diff
 router = APIRouter(prefix="/campaigns/{campaign_id}/versions", tags=["versions"])
 
 
-@router.get("", response_model=list[VersionSummary])
+@router.get(
+    "",
+    response_model=list[VersionSummary],
+    dependencies=[Depends(enforce_read_limit)],
+)
 async def list_versions(
     campaign_id: UUID,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -27,7 +32,11 @@ async def list_versions(
     return [VersionSummary.model_validate(row) for row in rows]
 
 
-@router.get("/{from_version}/diff/{to_version}", response_model=VersionDiff)
+@router.get(
+    "/{from_version}/diff/{to_version}",
+    response_model=VersionDiff,
+    dependencies=[Depends(enforce_read_limit)],
+)
 async def diff_versions(
     campaign_id: UUID,
     from_version: int,
@@ -45,6 +54,7 @@ async def diff_versions(
     "/{version_number}",
     response_model=CampaignPackage,
     response_model_exclude_none=True,
+    dependencies=[Depends(enforce_read_limit)],
 )
 async def get_version(
     campaign_id: UUID,

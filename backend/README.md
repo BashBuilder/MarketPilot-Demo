@@ -24,7 +24,15 @@ Optional with defaults: `DEEPSEEK_BASE_URL`, `EVENT_STREAM_MAXLEN`,
 `IMAGE_TIMEOUT_SECONDS`, `EMBEDDER` (`fake`, `huggingface`),
 `HF_EMBEDDING_MODEL`, `HUGGINGFACEHUB_API_TOKEN`, `COST_CAP_PER_RUN`,
 `MAX_IMAGE_CALLS_PER_RUN`, `MAX_SEARCH_CALLS_PER_RUN`, `RETRY_MAX_ATTEMPTS`,
-`SCORE_THRESHOLD`, `MAX_AUTO_LOOPS`, `FRONTEND_ORIGIN`, `LOG_LEVEL`.
+`SCORE_THRESHOLD`, `MAX_AUTO_LOOPS`, `MAX_IDEA_LENGTH`, `MAX_COMMENT_LENGTH`,
+`RATE_LIMIT_PER_MINUTE`, `MAX_CONCURRENT_RUNS`, `TRUST_PROXY`,
+`FRONTEND_ORIGIN`, `LOG_LEVEL`.
+
+`RATE_LIMIT_PER_MINUTE` (default 20) limits writes per client IP; reads get
+five times that budget. Set `TRUST_PROXY=true` only behind a proxy that sets
+`X-Forwarded-For`, otherwise the header is ignored. `MAX_CONCURRENT_RUNS`
+(default 3) rejects new campaigns and revisions with `429 too_many_runs` while
+that many runs are executing.
 
 Each run's Redis stream is capped at `EVENT_STREAM_MAXLEN` entries and expires
 `EVENT_STREAM_TTL_SECONDS` after a terminal event. With

@@ -39,6 +39,11 @@ def test_settings_load_from_environment(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.delenv("IMAGE_TIMEOUT_SECONDS", raising=False)
     monkeypatch.delenv("SCORE_THRESHOLD", raising=False)
     monkeypatch.delenv("MAX_AUTO_LOOPS", raising=False)
+    monkeypatch.delenv("MAX_IDEA_LENGTH", raising=False)
+    monkeypatch.delenv("MAX_COMMENT_LENGTH", raising=False)
+    monkeypatch.delenv("RATE_LIMIT_PER_MINUTE", raising=False)
+    monkeypatch.delenv("MAX_CONCURRENT_RUNS", raising=False)
+    monkeypatch.delenv("TRUST_PROXY", raising=False)
 
     settings = Settings(_env_file=None)
 
@@ -62,6 +67,11 @@ def test_settings_load_from_environment(monkeypatch: pytest.MonkeyPatch) -> None
     assert settings.retry_max_attempts == 3
     assert settings.score_threshold == 70
     assert settings.max_auto_loops == 2
+    assert settings.max_idea_length == 2000
+    assert settings.max_comment_length == 2000
+    assert settings.rate_limit_per_minute == 20
+    assert settings.max_concurrent_runs == 3
+    assert settings.trust_proxy is False
 
 
 def test_settings_reject_zero_retry_attempts(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -134,4 +144,24 @@ def test_settings_reject_negative_auto_loops(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("MAX_AUTO_LOOPS", "-1")
 
     with pytest.raises(ValidationError, match="max_auto_loops"):
+        Settings(_env_file=None)
+
+
+def test_settings_reject_zero_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/marketpilot")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "0")
+
+    with pytest.raises(ValidationError, match="rate_limit_per_minute"):
+        Settings(_env_file=None)
+
+
+def test_settings_reject_zero_concurrent_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/marketpilot")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("MAX_CONCURRENT_RUNS", "0")
+
+    with pytest.raises(ValidationError, match="max_concurrent_runs"):
         Settings(_env_file=None)
