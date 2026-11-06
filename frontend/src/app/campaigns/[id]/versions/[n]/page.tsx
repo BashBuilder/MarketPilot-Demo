@@ -34,7 +34,7 @@ function VersionUnavailable() {
         description="This version does not exist or is no longer available."
         action={
           <Link
-            href="/"
+            href="/campaigns"
             className="text-sm font-medium text-brand underline-offset-4 hover:underline"
           >
             Back to campaigns

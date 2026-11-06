@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
 import { SiteHeader } from "../site-header";
 
 beforeEach(() => {
-  pathname.current = "/";
+  pathname.current = "/campaigns";
   window.localStorage.clear();
   document.documentElement.classList.remove("dark");
   document.documentElement.style.colorScheme = "";
@@ -28,7 +28,7 @@ describe("SiteHeader", () => {
     const nav = screen.getByRole("navigation", { name: "Primary" });
     expect(within(nav).getByRole("link", { name: "Campaigns" })).toHaveAttribute(
       "href",
-      "/",
+      "/campaigns",
     );
     expect(
       within(nav).getByRole("link", { name: "New campaign" }),
@@ -62,6 +62,29 @@ describe("SiteHeader", () => {
     expect(
       screen.getByRole("link", { name: "Campaigns" }),
     ).not.toHaveAttribute("aria-current");
+  });
+
+  it("leaves navigation unselected on the landing page", () => {
+    pathname.current = "/";
+
+    render(<SiteHeader />);
+
+    expect(
+      screen.getByRole("link", { name: "Campaigns" }),
+    ).not.toHaveAttribute("aria-current");
+    expect(
+      screen.getByRole("link", { name: "New campaign" }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("keeps the campaigns item selected on a campaign detail route", () => {
+    pathname.current = "/campaigns/7c9e6679-7425-40de-944b-e07fc1f90ae7";
+
+    render(<SiteHeader />);
+
+    expect(
+      screen.getByRole("link", { name: "Campaigns" }),
+    ).toHaveAttribute("aria-current", "page");
   });
 
   it("keeps every control reachable in keyboard order", async () => {

@@ -31,8 +31,9 @@ frontend/
   src/
     app/
       layout.tsx
-      page.tsx                      campaign list and new campaign entry
+      page.tsx                      landing page
       campaigns/
+        page.tsx                    campaign list
         new/page.tsx                idea submission
         [id]/
           page.tsx                  campaign overview (latest version)
