@@ -17,6 +17,7 @@ describe("resolveAssetUrl", () => {
   it("leaves absolute web and inline URLs untouched", () => {
     for (const uri of [
       "https://cdn.example.com/asset.png",
+      "https://res.cloudinary.com/demo/image/upload/v1/marketpilot/asset.webp",
       "http://localhost:8000/asset.png",
       "data:image/png;base64,abc",
       "blob:https://app.example.com/id",

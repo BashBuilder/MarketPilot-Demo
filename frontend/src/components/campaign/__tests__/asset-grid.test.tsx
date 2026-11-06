@@ -21,6 +21,19 @@ describe("AssetGrid", () => {
     ).toBeInTheDocument();
   });
 
+  it("loads Cloudinary-hosted assets directly", () => {
+    const remote = {
+      ...assets[0],
+      uri: "https://res.cloudinary.com/demo/image/upload/v1/marketpilot/asset.webp",
+    };
+
+    render(<AssetGrid assets={[remote]} direction={haircareDirection} />);
+
+    const image = screen.getByRole("img", { name: firstAlt });
+    expect(image).toHaveAttribute("src", remote.uri);
+    expect(image.getAttribute("src")).not.toContain("/api/assets");
+  });
+
   it("reveals prompt, model and seed from the asset details toggle", async () => {
     const user = userEvent.setup();
     const { prompt, model, seed } = assets[0];

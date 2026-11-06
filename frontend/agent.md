@@ -171,7 +171,7 @@ The frontend only does what a signed-in user is allowed to do through the API.
 - Live run state is derived from the SSE event stream with a reducer; it is a pure function of the ordered events so it can be replayed in tests.
 - The SSE hook must handle: connection drop, native reconnect with `Last-Event-ID` (no manual close and reopen), duplicate events (dedupe by event id), a bounded stall/no-progress state, and cleanup on unmount.
 - Never store anything sensitive in `localStorage`. Only UI preferences may be persisted there.
-- Images are loaded from backend asset URIs. Absolute web URLs load directly; backend-relative file names go through the same-origin `/api/assets` proxy, which reads the directory configured by the server-only `BACKEND_ASSET_DIR`. Always provide `alt` text from the creative direction and a fallback state if an image fails to load.
+- Images are loaded from backend asset URIs. Hosted assets are absolute Cloudinary `https://res.cloudinary.com` URLs and load directly; the CSP allows that image origin. Backend-relative file names go through the same-origin `/api/assets` proxy, which reads the directory configured by the server-only `BACKEND_ASSET_DIR`. Always provide `alt` text from the creative direction and a fallback state if an image fails to load.
 
 ---
 
@@ -193,7 +193,7 @@ The frontend only does what a signed-in user is allowed to do through the API.
 - Render all backend text (copy, research, justifications) as text. No `dangerouslySetInnerHTML` on backend content.
 - Validate every response with Zod before use. Treat parse failure as an error state.
 - Validate forms client-side (idea length limit) but never rely on that alone; show backend validation errors clearly.
-- Set security headers in `next.config` (CSP, `X-Content-Type-Options`, `Referrer-Policy`, frame protection).
+- Set security headers in `next.config` (CSP, `X-Content-Type-Options`, `Referrer-Policy`, frame protection). `img-src` must allow `https://res.cloudinary.com` for hosted assets; do not widen `connect-src` for them.
 - Do not log tokens, full prompts or user content to the console in production builds.
 - Pin dependencies through `pnpm-lock.yaml`; run `pnpm audit` in CI.
 - Dockerfile: non-root user, multi-stage build, no secrets baked into the image.

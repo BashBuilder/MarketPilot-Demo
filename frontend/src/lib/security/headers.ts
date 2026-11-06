@@ -6,6 +6,13 @@
 
 export const DEFAULT_API_URL = "http://localhost:8000/api/v1";
 
+/**
+ * Cloudinary serves the secure URLs recorded by the backend's asset store.
+ * Images load directly from this origin, so the CSP must allow it even when
+ * the API itself lives on a different host.
+ */
+export const CLOUDINARY_ASSET_ORIGIN = "https://res.cloudinary.com";
+
 export interface SecurityHeader {
   key: string;
   value: string;
@@ -39,7 +46,7 @@ export function securityHeaders(
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    `img-src 'self'${origin ? ` ${origin}` : ""} data: blob:`,
+    `img-src 'self'${origin ? ` ${origin}` : ""} ${CLOUDINARY_ASSET_ORIGIN} data: blob:`,
     `connect-src 'self'${origin ? ` ${origin}` : ""}${
       isDevelopment ? " ws: wss:" : ""
     }`,
