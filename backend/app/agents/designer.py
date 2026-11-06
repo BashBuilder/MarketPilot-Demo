@@ -93,7 +93,10 @@ class DesignerAgent(BaseAgent[AssetSet]):
     ) -> list[Asset]:
         negative = ", ".join(direction.negative_prompts)
         assets: list[Asset] = []
-        for index, prompt in enumerate(direction.image_prompts):
+        # The Creative Director may return any number of prompts; generate only
+        # the first few so a long direction cannot exhaust the run's image cap.
+        prompts = direction.image_prompts[: settings.max_generated_images_per_run]
+        for index, prompt in enumerate(prompts):
             args = GenerateImageArgs(
                 prompt=prompt,
                 negative_prompt=negative,
