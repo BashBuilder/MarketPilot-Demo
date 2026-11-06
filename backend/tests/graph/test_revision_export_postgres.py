@@ -1,5 +1,6 @@
 """End-to-end Step 11 flow: revise, approve, export and diff two versions."""
 
+import hashlib
 from pathlib import Path
 from uuid import UUID
 
@@ -8,12 +9,14 @@ from node_fakes import RecordingEmitter
 from workflow_loop_fakes import COPY, REVISED_COPY, ScriptedAgent, default_agents
 from workflow_run_support import dependencies, new_run, reset_calls, run_settings
 
+from app.agents.outputs import Asset, AssetSet
 from app.core.errors import GuardrailViolation
 from app.database.repositories import versions
 from app.graph.approvals import approve_run, revise_run
 from app.graph.diff import load_diff
 from app.graph.workflow import run_workflow
 from app.tools.export_tools import export_package
+from app.tools.image_png import png_bytes
 
 pytestmark = pytest.mark.postgres
 
@@ -22,6 +25,23 @@ CHANGED_PATHS = {
     "copy.variants.0.description",
     "copy.variants.0.cta",
 }
+
+
+def _exportable_assets(asset_dir: Path) -> AssetSet:
+    """Write a real asset so export can verify bytes and copy them."""
+    data = png_bytes(8, 8, (51, 102, 153))
+    (asset_dir / "hero.png").write_bytes(data)
+    return AssetSet(
+        assets=[
+            Asset(
+                uri="hero.png",
+                checksum=hashlib.sha256(data).hexdigest(),
+                model="fake",
+                seed=1,
+                prompt="Editorial portrait",
+            )
+        ]
+    )
 
 
 async def _at_gate(
@@ -48,6 +68,7 @@ async def test_revision_exports_only_after_approval_and_diff_is_minimal(
     settings = run_settings()
     emitter = RecordingEmitter()
     agents = default_agents()
+    agents["designer"] = ScriptedAgent("designer", [_exportable_assets(tmp_path)])
     run_id, campaign_id = await _at_gate(pg_session_factory, agents, emitter, settings)
     first_copy = COPY.variants[0]
     revised_copy = REVISED_COPY.variants[0]
