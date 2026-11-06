@@ -33,7 +33,8 @@ The Supervisor routes between nodes. A failed node goes through the retry policy
 - Python 3.12, FastAPI, `uv` for environment and dependencies
 - LangGraph and LangChain for orchestration (CrewAI only for comparison spikes)
 - Primary LLM: DeepSeek through an OpenAI-compatible client (`langchain-openai`)
-- Image generation: open-source model (FLUX.1 schnell or SDXL) behind an `ImageGenerator` interface
+- Image generation: hosted open-weight model via Hugging Face Inference Providers behind an `ImageGenerator` interface; no local weights or inference
+- Asset storage: behind an `AssetStorage` interface; local files for development, Cloudinary uploads with public URLs in production
 - Video generation: optional. Evaluate open-source models; if none is practical, keep a stub and skip video
 - PostgreSQL with `pgvector`, SQLAlchemy (async) with `asyncpg`, Alembic migrations
 - Redis for caching, pubsub and run locks
@@ -314,7 +315,7 @@ Work strictly in order. Each step: goal, tasks, done when.
 
 ### Step 8: Tools
 
-- Search with provenance, pgvector policy lookup, `ImageGenerator` interface with a local open-source implementation and a fake, optional video stub, export.
+- Search with provenance, pgvector policy lookup, `ImageGenerator` interface with a hosted implementation and a fake, optional video stub, export.
 - **Done when:** each tool has typed args and results, fake-based tests, and image outputs record model, seed, prompt and checksum.
 
 ### Step 9: Agents, one at a time
@@ -344,7 +345,7 @@ Work strictly in order. Each step: goal, tasks, done when.
 
 ### Step 14: Image and video model exploration
 
-- Benchmark 2 to 3 open-source image models on the same 5 briefs (quality, latency, VRAM, licence). Evaluate one open-source video model; if impractical, document it and keep the stub.
+- Benchmark 2 to 3 hosted open-source image models on the same 5 briefs (quality, latency, cost, licence). Evaluate one hosted open-source video model; if impractical, document it and keep the stub. Do not download or run model weights locally.
 - **Done when:** `docs/model-decision.md` records results and the chosen default.
 
 ### Step 15: Hardening, CI and deployment

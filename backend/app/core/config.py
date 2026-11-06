@@ -8,9 +8,10 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-ImageProvider = Literal["fake", "hosted", "local"]
+ImageProvider = Literal["fake", "hosted", "huggingface"]
 SearchProviderName = Literal["fake"]
 EmbedderName = Literal["fake", "huggingface"]
+AssetStorageName = Literal["local", "cloudinary"]
 
 
 class Settings(BaseSettings):
@@ -39,14 +40,21 @@ class Settings(BaseSettings):
     image_api_url: str | None = None
     image_api_key: SecretStr | None = None
     image_model_id: str = Field(default="stabilityai/sdxl-turbo", min_length=1)
-    image_timeout_seconds: float = Field(default=120.0, gt=0)
+    image_timeout_seconds: float = Field(default=45.0, gt=0)
     search_provider: SearchProviderName = "fake"
     embedder: EmbedderName = "fake"
     hf_embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", min_length=1)
     huggingfacehub_api_token: SecretStr | None = None
     asset_dir: Path = Path("assets")
+    asset_storage: AssetStorageName = "local"
+    cloudinary_cloud_name: str | None = None
+    cloudinary_api_key: SecretStr | None = None
+    cloudinary_api_secret: SecretStr | None = None
+    cloudinary_folder: str = Field(default="marketpilot", min_length=1)
+    cloudinary_timeout_seconds: float = Field(default=30.0, gt=0)
     cost_cap_per_run: float = Field(default=2.0, gt=0)
     max_image_calls_per_run: int = Field(default=8, ge=0)
+    max_generated_images_per_run: int = Field(default=1, ge=1)
     max_search_calls_per_run: int = Field(default=20, ge=0)
     max_image_prompt_length: int = Field(default=1000, ge=1)
     retry_max_attempts: int = Field(default=3, ge=1)

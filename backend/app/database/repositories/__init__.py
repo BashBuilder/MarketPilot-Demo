@@ -3,6 +3,7 @@
 from app.database.repositories import (
     agent_outputs,
     approvals,
+    assets,
     campaigns,
     checkpoints,
     runs,
@@ -13,6 +14,7 @@ from app.database.repositories import (
 __all__ = [
     "agent_outputs",
     "approvals",
+    "assets",
     "campaigns",
     "checkpoints",
     "runs",
