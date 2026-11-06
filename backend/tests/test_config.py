@@ -59,11 +59,11 @@ def test_settings_load_from_environment(monkeypatch: pytest.MonkeyPatch) -> None
     assert settings.image_provider == "fake"
     assert settings.image_api_url is None
     assert settings.image_model_id == "stabilityai/sdxl-turbo"
-    assert settings.image_timeout_seconds == 120.0
+    assert settings.image_timeout_seconds == 45.0
     assert settings.embedder == "fake"
     assert settings.hf_embedding_model == "sentence-transformers/all-MiniLM-L6-v2"
     assert settings.max_image_calls_per_run == 8
-    assert settings.max_generated_images_per_run == 2
+    assert settings.max_generated_images_per_run == 1
     assert settings.max_search_calls_per_run == 20
     assert settings.retry_max_attempts == 3
     assert settings.score_threshold == 70

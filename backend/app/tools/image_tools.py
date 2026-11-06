@@ -1,7 +1,7 @@
 """Image generation tools and the deterministic fake used in tests and dev.
 
 The protocol keeps the Designer agent independent of any real model: swapping
-in a local FLUX or SDXL implementation later only requires another
+in a hosted FLUX or SDXL implementation only requires another
 ``ImageGenerator``.
 """
 

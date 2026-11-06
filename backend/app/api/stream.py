@@ -25,7 +25,7 @@ from app.events.envelope import EventRecord
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
-HEARTBEAT_SECONDS = 15.0
+HEARTBEAT_SECONDS = 5.0
 POLL_SECONDS = 0.1
 _TERMINAL_EVENTS = frozenset({"awaiting_approval", "completed"})
 

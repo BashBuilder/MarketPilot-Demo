@@ -27,7 +27,7 @@ async def test_all_direction_prompts_become_verified_assets(
     run_id: UUID,
     tmp_path: Path,
 ) -> None:
-    limits = settings(tmp_path)
+    limits = settings(tmp_path, max_generated_images_per_run=2)
     tools = make_tools(session_factory, run_id, tmp_path, tool_settings=limits)
     workflow = state()
     before = workflow.model_dump()
@@ -53,7 +53,7 @@ async def test_revision_regenerates_only_flagged_assets(
     run_id: UUID,
     tmp_path: Path,
 ) -> None:
-    limits = settings(tmp_path)
+    limits = settings(tmp_path, max_generated_images_per_run=2)
     tools = make_tools(session_factory, run_id, tmp_path, tool_settings=limits)
     agent = DesignerAgent()
     first = await agent.run(state(), tools=tools, settings=limits)
@@ -123,7 +123,7 @@ async def test_image_cap_violation_is_not_retried(
     run_id: UUID,
     tmp_path: Path,
 ) -> None:
-    limits = settings(tmp_path, max_image_calls_per_run=1)
+    limits = settings(tmp_path, max_generated_images_per_run=2, max_image_calls_per_run=1)
     tools = make_tools(session_factory, run_id, tmp_path, tool_settings=limits)
 
     with pytest.raises(GuardrailViolation, match="image cap of 1"):
@@ -134,7 +134,7 @@ async def test_image_cap_violation_is_not_retried(
     assert sorted(row.status for row in rows) == ["denied", "success"]
 
 
-async def test_generation_is_limited_to_two_images(
+async def test_generation_is_limited_to_one_image(
     session_factory: async_sessionmaker[AsyncSession],
     run_id: UUID,
     tmp_path: Path,
@@ -147,9 +147,9 @@ async def test_generation_is_limited_to_two_images(
 
     result = await DesignerAgent().run(workflow, tools=tools, settings=limits)
 
-    assert [asset.prompt for asset in result.assets] == prompts[:2]
+    assert [asset.prompt for asset in result.assets] == prompts[:1]
     rows = await audit_rows(session_factory, run_id)
-    assert [row.tool for row in rows] == ["generate_image"] * 2
+    assert [row.tool for row in rows] == ["generate_image"]
     assert all(row.status == "success" for row in rows)
 
 
