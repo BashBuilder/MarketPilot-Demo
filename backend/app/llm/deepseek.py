@@ -58,6 +58,13 @@ class DeepSeekLLMClient:
         if raw_args is not None:
             return raw_args
 
+        # DeepSeek occasionally answers with the JSON object in ``content``
+        # even when a tool call was requested. Accept that shape instead of
+        # handing an empty payload to the schema verifier.
+        content_args = _content_args(result.get("raw"))
+        if content_args is not None:
+            return content_args
+
         error = result.get("parsing_error")
         if error is not None:
             raise error
@@ -71,7 +78,7 @@ def _tool_call_args(raw: Any) -> dict[str, Any] | None:
         first = calls[0]
         if isinstance(first, dict):
             args = first.get("args")
-            if isinstance(args, dict):
+            if isinstance(args, dict) and args:
                 return args
 
     additional = getattr(raw, "additional_kwargs", None)
@@ -82,9 +89,41 @@ def _tool_call_args(raw: Any) -> dict[str, Any] | None:
             function = first_call.get("function") if isinstance(first_call, dict) else None
             arguments = function.get("arguments") if isinstance(function, dict) else None
             if isinstance(arguments, str):
-                try:
-                    decoded = json.loads(arguments)
-                except json.JSONDecodeError:
-                    return None
-                return decoded if isinstance(decoded, dict) else None
+                decoded = _loads_object(arguments)
+                if decoded is not None:
+                    return decoded
     return None
+
+
+def _content_args(raw: Any) -> dict[str, Any] | None:
+    """Parse a JSON object some models place in the message content.
+
+    A model that ignores ``tool_choice`` can still produce a valid structured
+    payload; returning it keeps the harness's schema verification useful
+    instead of reporting every field as missing.
+    """
+    content = getattr(raw, "content", None)
+    if isinstance(content, list):
+        content = "".join(
+            part.get("text", "")
+            for part in content
+            if isinstance(part, dict) and part.get("type") in {None, "text"}
+        )
+    if not isinstance(content, str):
+        return None
+
+    text = content.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    return _loads_object(text) if text else None
+
+
+def _loads_object(text: str) -> dict[str, Any] | None:
+    try:
+        decoded = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    return decoded if isinstance(decoded, dict) and decoded else None
