@@ -170,7 +170,7 @@ The frontend only does what a signed-in user is allowed to do through the API.
 - Live run state is derived from the SSE event stream with a reducer; it is a pure function of the ordered events so it can be replayed in tests.
 - The SSE hook must handle: connection drop, native reconnect with `Last-Event-ID` (no manual close and reopen), duplicate events (dedupe by event id), a bounded stall/no-progress state, and cleanup on unmount.
 - Never store anything sensitive in `localStorage`. Only UI preferences may be persisted there.
-- Images are loaded from backend asset URIs; always provide `alt` text from the creative direction and a fallback state if an image fails to load.
+- Images are loaded from backend asset URIs. Absolute web URLs load directly; backend-relative file names go through the same-origin `/api/assets` proxy, which reads the directory configured by the server-only `BACKEND_ASSET_DIR`. Always provide `alt` text from the creative direction and a fallback state if an image fails to load.
 
 ---
 
