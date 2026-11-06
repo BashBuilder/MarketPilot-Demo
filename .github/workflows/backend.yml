@@ -1,0 +1,91 @@
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  verify:
+    name: Lint, type check, tests, migrations, audit, evaluation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: marketpilot
+          POSTGRES_USER: marketpilot
+          POSTGRES_PASSWORD: marketpilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marketpilot -d marketpilot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_MODE: fake
+      DEEPSEEK_API_KEY: ci-placeholder
+      DEEPSEEK_BASE_URL: https://api.deepseek.com
+      DATABASE_URL: postgresql+asyncpg://marketpilot:marketpilot@localhost:5432/marketpilot
+      REDIS_URL: redis://localhost:6379/0
+      TEST_DATABASE_URL: postgresql+asyncpg://marketpilot:marketpilot@localhost:5432/marketpilot_test
+      IMAGE_PROVIDER: fake
+      SEARCH_PROVIDER: fake
+      EMBEDDER: fake
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run mypy app
+
+      - name: Create test database
+        run: >-
+          PGPASSWORD=marketpilot psql -h localhost -U marketpilot -d marketpilot
+          -c "CREATE DATABASE marketpilot_test;"
+
+      - name: Tests
+        run: uv run pytest
+
+      - name: Apply migrations
+        run: uv run alembic upgrade head
+
+      - name: Check for model drift
+        run: uv run alembic check
+
+      - name: Audit dependencies
+        run: uv run pip-audit
+
+      - name: Offline evaluation gate
+        run: uv run python -m app.evaluation.runner
