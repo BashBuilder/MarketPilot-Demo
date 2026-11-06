@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import Depends, Request
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.agents.contracts import ChatMessage, LLMClient, ToolInvoker
 from app.core.config import Settings, get_settings
@@ -17,7 +17,8 @@ from app.events.emitter import make_emitter
 from app.graph.node_support import NodeEventEmitter
 from app.graph.nodes import NodeAgent
 from app.graph.workflow import WorkflowDependencies
-from app.harness.registry import AgentName
+from app.harness.registry import AgentName, ToolRegistry
+from app.runs.services import build_tools
 
 
 class RunLauncher(Protocol):
@@ -44,6 +45,8 @@ class WorkflowServices:
     llm: LLMClient
     tools: Mapping[AgentName, ToolInvoker]
     emit: NodeEventEmitter
+    registry: ToolRegistry | None = None
+    session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,12 +115,20 @@ def get_workflow_context(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> WorkflowContext:
     """Bind the request session and run id to the shared services."""
+    tools = services.tools
+    if services.registry is not None and services.session_factory is not None:
+        tools = build_tools(
+            registry=services.registry,
+            settings=settings,
+            session_factory=services.session_factory,
+            run_id=run_id,
+        )
     deps = WorkflowDependencies(
         run_id=run_id,
         llm=services.llm,
         session=session,
         emit=services.emit,
-        tools=services.tools,
+        tools=tools,
         settings=settings,
     )
     return WorkflowContext(services=services, deps=deps)

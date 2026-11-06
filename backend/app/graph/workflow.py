@@ -20,7 +20,7 @@ from app.agents.contracts import LLMClient, ToolInvoker
 from app.agents.scoring import weakest_node
 from app.core.config import Settings, get_settings
 from app.core.errors import ValidationFailure
-from app.database.models import ApprovalDecision, RunStatus, WorkflowRun
+from app.database.models import ApprovalDecision, CampaignStatus, RunStatus, WorkflowRun
 from app.database.repositories import campaigns, runs, versions
 from app.graph.node_support import NodeEventEmitter, event_payload
 from app.graph.nodes import NodeAgent, NodeDependencies, WorkflowNode, make_node
@@ -354,6 +354,7 @@ async def _complete(
     score = state.score.total if state.score is not None else version.score
     state.status = "completed"
     await runs.set_status(deps.session, run_id, RunStatus.COMPLETED, current_node=None)
+    await _set_campaign_status(deps.session, run_id, CampaignStatus.COMPLETED)
     await save_checkpoint(deps.session, run_id, DONE_NODE, state)
     await deps.session.commit()
 
@@ -374,6 +375,7 @@ async def _drive(
     """Run the graph from ``start_node`` and commit after every super-step."""
     state.status = "running"
     await runs.set_status(deps.session, run_id, RunStatus.RUNNING, current_node=start_node)
+    await _set_campaign_status(deps.session, run_id, CampaignStatus.RUNNING)
     await deps.session.commit()
 
     graph = build_workflow(agents, deps, start_node=start_node)
@@ -393,12 +395,24 @@ def _check_dependencies(run_id: UUID, deps: WorkflowDependencies) -> None:
         raise ValueError("workflow dependencies belong to a different run")
 
 
+async def _set_campaign_status(
+    session: AsyncSession,
+    run_id: UUID,
+    status: CampaignStatus,
+) -> None:
+    """Keep the campaign summary in step with the run a client is watching."""
+    run = await runs.get(session, run_id)
+    if run is not None:
+        await campaigns.set_status(session, run.campaign_id, status)
+
+
 def _make_approval_node(deps: WorkflowDependencies) -> WorkflowNode:
     """Persist the human gate and expose it as the graph's terminal state."""
 
     async def approval(state: WorkflowState) -> WorkflowState:
         version = await snapshot_package(deps.session, deps.run_id, state)
         await request_approval(deps.session, deps.run_id)
+        await _set_campaign_status(deps.session, deps.run_id, CampaignStatus.AWAITING_APPROVAL)
         state.status = "awaiting_approval"
         # Persist before announcing: the stream closes on this event, and a
         # client that immediately reloads the run must see the gate.
