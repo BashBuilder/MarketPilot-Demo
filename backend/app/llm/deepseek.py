@@ -1,9 +1,12 @@
 """DeepSeek structured-output client behind the ``LLMClient`` protocol.
 
 The harness owns retries and validation, so this adapter makes exactly one
-request per call and lets provider errors propagate to the node wrapper.
+request per call. It deliberately returns the raw tool arguments instead of
+letting LangChain validate the payload: a schema miss must reach
+``run_with_verification`` so the validation error becomes retry feedback.
 """
 
+import json
 from collections.abc import Sequence
 from typing import Any
 
@@ -20,6 +23,8 @@ class DeepSeekLLMClient:
     """Call DeepSeek through its OpenAI-compatible endpoint."""
 
     def __init__(self, settings: Settings, *, model: str = DEFAULT_MODEL) -> None:
+        # ChatOpenAI is only the OpenAI-compatible transport. The endpoint and
+        # model below are DeepSeek's; no OpenAI model is configured anywhere.
         self._model = ChatOpenAI(
             model=model,
             api_key=settings.deepseek_api_key,
@@ -35,6 +40,51 @@ class DeepSeekLLMClient:
         *,
         schema: type[BaseModel],
     ) -> Any:
-        """Return one payload matching ``schema`` or raise a provider error."""
-        runnable = self._model.with_structured_output(schema, method="function_calling")
-        return await runnable.ainvoke([dict(message) for message in messages])
+        """Return the raw payload for ``schema`` or raise a provider error."""
+        runnable = self._model.with_structured_output(
+            schema,
+            method="function_calling",
+            include_raw=True,
+        )
+        result = await runnable.ainvoke([dict(message) for message in messages])
+        if not isinstance(result, dict):
+            return result
+
+        parsed = result.get("parsed")
+        if parsed is not None:
+            return parsed
+
+        raw_args = _tool_call_args(result.get("raw"))
+        if raw_args is not None:
+            return raw_args
+
+        error = result.get("parsing_error")
+        if error is not None:
+            raise error
+        return {}
+
+
+def _tool_call_args(raw: Any) -> dict[str, Any] | None:
+    """Extract the first tool call's arguments from a LangChain message."""
+    calls = getattr(raw, "tool_calls", None)
+    if isinstance(calls, list) and calls:
+        first = calls[0]
+        if isinstance(first, dict):
+            args = first.get("args")
+            if isinstance(args, dict):
+                return args
+
+    additional = getattr(raw, "additional_kwargs", None)
+    if isinstance(additional, dict):
+        legacy = additional.get("tool_calls")
+        if isinstance(legacy, list) and legacy:
+            first_call = legacy[0]
+            function = first_call.get("function") if isinstance(first_call, dict) else None
+            arguments = function.get("arguments") if isinstance(function, dict) else None
+            if isinstance(arguments, str):
+                try:
+                    decoded = json.loads(arguments)
+                except json.JSONDecodeError:
+                    return None
+                return decoded if isinstance(decoded, dict) else None
+    return None
