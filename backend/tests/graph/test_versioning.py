@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.agents.outputs import AdCopySet
 from app.database.models import CampaignVersion, ImmutableVersionError
-from app.database.repositories import campaigns, runs, versions
+from app.database.repositories import assets, campaigns, runs, versions
 from app.graph.state import WorkflowState
 from app.graph.versioning import PACKAGE_FIELDS, snapshot_package
 
@@ -60,6 +60,23 @@ async def test_first_snapshot_creates_version_one_without_a_parent(
 
     assert stored is not None
     assert stored.score == 76.0
+
+
+async def test_snapshot_persists_the_asset_rows_for_the_version(
+    session_factory: async_sessionmaker[AsyncSession],
+    full_state: WorkflowState,
+) -> None:
+    run_id, _ = await _run(session_factory)
+
+    async with session_factory() as session:
+        version = await snapshot_package(session, run_id, full_state)
+        await session.commit()
+        rows = await assets.list_for_version(session, version.id)
+
+    assert len(rows) == 1
+    assert rows[0].uri == "s3://bucket/hero.png"
+    assert rows[0].checksum == "a" * 64
+    assert rows[0].media_type == "image/png"
 
 
 async def test_second_snapshot_links_to_the_first_and_leaves_it_unchanged(

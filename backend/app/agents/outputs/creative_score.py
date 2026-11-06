@@ -14,7 +14,14 @@ class ScoreDimension(OutputModel):
     """A 0 to 10 score with the one-line reason behind it."""
 
     score: Annotated[float, Field(ge=0, le=10)]
-    justification: Annotated[str, Field(min_length=5, max_length=200)]
+    justification: Annotated[
+        str,
+        Field(
+            min_length=5,
+            max_length=200,
+            description="One line, at most 200 characters.",
+        ),
+    ]
 
     @field_validator("justification")
     @classmethod

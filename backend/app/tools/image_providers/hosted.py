@@ -8,6 +8,7 @@ response is JSON ``{"image_base64": "<png|jpeg|webp bytes>"}``; requests carry
 transport errors, 5xx) are retryable; a 4xx or malformed payload is not.
 """
 
+import asyncio
 import base64
 import hashlib
 from pathlib import Path
@@ -66,8 +67,8 @@ class HostedImageGenerator:
             prompt=prompt,
         )
 
-    async def edit(self, image_path: Path, instruction: str) -> GeneratedImage:
-        source = read_source(image_path, self._asset_dir)
+    async def edit(self, image_path: Path | str, instruction: str) -> GeneratedImage:
+        source = read_source(Path(image_path), self._asset_dir)
         data = await self._post(
             f"{self._api_url}/edit",
             {"instruction": instruction, "image_base64": base64.b64encode(source).decode()},
@@ -86,6 +87,25 @@ class HostedImageGenerator:
     async def _post(self, url: str, payload: dict[str, object]) -> bytes:
         headers = {"Authorization": f"Bearer {self._api_key}"}
         try:
+            response = await asyncio.wait_for(
+                self._send(url, payload, headers),
+                timeout=self._timeout,
+            )
+        except TimeoutError as exc:
+            raise ToolError(
+                f"hosted image request timed out after {self._timeout:g}s",
+                retryable=True,
+                details={"timeout_seconds": self._timeout},
+            ) from exc
+        return decode_base64(self._extract(response))
+
+    async def _send(
+        self,
+        url: str,
+        payload: dict[str, object],
+        headers: dict[str, str],
+    ) -> httpx.Response:
+        try:
             async with httpx.AsyncClient(
                 timeout=self._timeout, transport=self._transport
             ) as client:
@@ -102,7 +122,7 @@ class HostedImageGenerator:
             ) from exc
         except httpx.RequestError as exc:
             raise ToolError("hosted image request failed", retryable=True) from exc
-        return decode_base64(self._extract(response))
+        return response
 
     @staticmethod
     def _extract(response: httpx.Response) -> str:

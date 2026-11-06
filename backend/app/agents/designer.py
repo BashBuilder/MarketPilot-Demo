@@ -9,7 +9,6 @@ burning more of the run's image budget.
 
 import random
 from collections.abc import Callable, Sequence
-from pathlib import Path
 
 from app.agents.base import BaseAgent, EventEmitter, LLMClient, ToolInvoker
 from app.agents.designer_targets import (
@@ -93,7 +92,10 @@ class DesignerAgent(BaseAgent[AssetSet]):
     ) -> list[Asset]:
         negative = ", ".join(direction.negative_prompts)
         assets: list[Asset] = []
-        for index, prompt in enumerate(direction.image_prompts):
+        # The Creative Director may return any number of prompts; generate only
+        # the first few so a long direction cannot exhaust the run's image cap.
+        prompts = direction.image_prompts[: settings.max_generated_images_per_run]
+        for index, prompt in enumerate(prompts):
             args = GenerateImageArgs(
                 prompt=prompt,
                 negative_prompt=negative,
@@ -116,7 +118,7 @@ class DesignerAgent(BaseAgent[AssetSet]):
         for number in sorted(flagged):
             current = assets[number - 1]
             instruction = revision_instruction(failed, current, number)
-            args = EditImageArgs(image_path=Path(current.uri), instruction=instruction)
+            args = EditImageArgs(image_path=current.uri, instruction=instruction)
             raw = await tools.call(_EDIT, args.model_dump())
             assets[number - 1] = to_asset(GeneratedImage.model_validate(raw), settings.asset_dir)
         return AssetSet(assets=assets)

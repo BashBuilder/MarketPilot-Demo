@@ -29,10 +29,6 @@ dependencies = [
 embeddings = [
     "langchain-huggingface>=1.2.3",
 ]
-images = [
-    "diffusers>=0.31.0",
-    "torch>=2.5.0",
-]
 
 [dependency-groups]
 dev = [

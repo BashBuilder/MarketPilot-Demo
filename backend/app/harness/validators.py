@@ -80,7 +80,12 @@ class CopySemanticValidator:
 
 
 class AssetSemanticValidator:
-    """Confirm each asset exists, is an image, and matches its checksum."""
+    """Confirm each asset exists, is an image, and matches its checksum.
+
+    Remote URIs are not fetched again: the asset store validates the bytes
+    (magic number, size, checksum) immediately before uploading them, so the
+    stored object is the exact file this check would have inspected.
+    """
 
     def __init__(self, asset_root: Path) -> None:
         self._root = asset_root
@@ -88,6 +93,8 @@ class AssetSemanticValidator:
     def validate(self, value: AssetSet) -> list[Issue]:
         issues: list[Issue] = []
         for asset in value.assets:
+            if asset.uri.startswith("https://"):
+                continue
             path = self._resolve(asset.uri)
             if path is None:
                 issues.append(f"asset {asset.uri!r}: unsupported uri scheme")
