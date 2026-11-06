@@ -9,6 +9,12 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketpilot -d marketpilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
@@ -16,27 +22,52 @@ services:
       - "6379:6379"
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-  # backend:
-  #   build: ./backend
-  #   ports:
-  #     - "8000:8000"
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #   environment:
-  #     - DATABASE_URL=postgresql+asyncpg://marketpilot:marketpilot@postgres:5432/marketpilot
-  #     - REDIS_URL=redis://redis:6379/0
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      # fake keeps a fresh clone runnable without real provider keys.
+      APP_MODE: ${APP_MODE:-fake}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-fake-local-key}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DATABASE_URL: postgresql+asyncpg://marketpilot:marketpilot@postgres:5432/marketpilot
+      REDIS_URL: redis://redis:6379/0
+      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-fake}
+      SEARCH_PROVIDER: ${SEARCH_PROVIDER:-fake}
+      EMBEDDER: ${EMBEDDER:-fake}
+      ASSET_DIR: /data/assets
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+    volumes:
+      - assets:/data/assets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
-  # frontend:
-  #   build: ./frontend
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - backend
-  #   environment:
-  #     - NEXT_PUBLIC_API_URL=http://backend:8000/api/v1
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the browser bundle at build time.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   pgdata:
   redisdata:
+  assets:
