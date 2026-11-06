@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.tools.image_providers import build_image_generator
+from app.tools.image_providers.cloudflare import CloudflareImageGenerator
 from app.tools.image_providers.hosted import HostedImageGenerator
 from app.tools.image_providers.huggingface import HuggingFaceImageGenerator
 from app.tools.image_tools import FakeImageGenerator
@@ -69,3 +70,22 @@ def test_huggingface_provider_requires_a_token(tmp_path: Path) -> None:
 def test_unknown_provider_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(ValidationError, match="image_provider"):
         settings_for(tmp_path, image_provider="flux")
+
+
+def test_cloudflare_provider_is_built_from_settings(tmp_path: Path) -> None:
+    settings = settings_for(
+        tmp_path,
+        image_provider="cloudflare",
+        cloudflare_account_id="account",
+        cloudflare_api_token="secret",
+        cloudflare_image_model="@cf/black-forest-labs/flux-1-schnell",
+    )
+
+    assert isinstance(build_image_generator(settings), CloudflareImageGenerator)
+
+
+def test_cloudflare_provider_requires_account_and_token(tmp_path: Path) -> None:
+    settings = settings_for(tmp_path, image_provider="cloudflare")
+
+    with pytest.raises(RuntimeError, match="CLOUDFLARE_ACCOUNT_ID"):
+        build_image_generator(settings)

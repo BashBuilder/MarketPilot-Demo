@@ -20,8 +20,10 @@ Required: `DEEPSEEK_API_KEY`, `DATABASE_URL`, `REDIS_URL`.
 
 Optional with defaults: `DEEPSEEK_BASE_URL`, `EVENT_STREAM_MAXLEN`,
 `EVENT_STREAM_TTL_SECONDS`, `RESUME_ON_STARTUP`, `IMAGE_PROVIDER` (`fake`,
-`hosted`, `huggingface`), `IMAGE_API_URL`, `IMAGE_API_KEY`, `IMAGE_MODEL_ID`,
-`IMAGE_TIMEOUT_SECONDS`, `SEARCH_PROVIDER`, `EMBEDDER` (`fake`, `huggingface`),
+`hosted`, `huggingface`, `cloudflare`), `IMAGE_API_URL`, `IMAGE_API_KEY`,
+`IMAGE_MODEL_ID`, `IMAGE_TIMEOUT_SECONDS`, `CLOUDFLARE_ACCOUNT_ID`,
+`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_IMAGE_MODEL`, `CLOUDFLARE_EDIT_MODEL`,
+`SEARCH_PROVIDER`, `EMBEDDER` (`fake`, `huggingface`),
 `HF_EMBEDDING_MODEL`, `HUGGINGFACEHUB_API_TOKEN`, `ASSET_STORAGE` (`local`,
 `cloudinary`), `ASSET_DIR`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`,
 `CLOUDINARY_API_SECRET`, `CLOUDINARY_FOLDER`, `CLOUDINARY_TIMEOUT_SECONDS`,
@@ -49,15 +51,17 @@ lock and resumes them from the latest checkpoint; one failed resume is logged
 and does not block the others or the app from starting.
 
 `IMAGE_PROVIDER=fake` is the default and writes deterministic PNGs with no
-network or model files. `hosted` calls `IMAGE_API_URL` (Bearer `IMAGE_API_KEY`).
-`huggingface` calls Hugging Face Inference Providers over HTTP with
-`HUGGINGFACEHUB_API_TOKEN` and `IMAGE_MODEL_ID`. Both remote providers download
-and run nothing locally. `IMAGE_TIMEOUT_SECONDS` (default 45) is a total
-per-image deadline enforced by both adapters. `huggingface` does not support
-`edit_image`; use `hosted` when the compliance loop must revise an existing
-asset. Janus is not available through the serverless `hf-inference` router; to
-use it without local weights, deploy a dedicated Hugging Face Inference Endpoint
-and point `IMAGE_API_URL` at it.
+network or model files. `cloudflare` calls Cloudflare Workers AI over HTTP with
+`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; `CLOUDFLARE_IMAGE_MODEL`
+defaults to `@cf/black-forest-labs/flux-1-schnell` and
+`CLOUDFLARE_EDIT_MODEL` to `@cf/runwayml/stable-diffusion-v1-5-img2img`, so
+`edit_image` works. `hosted` calls `IMAGE_API_URL` (Bearer `IMAGE_API_KEY`).
+`huggingface` calls Hugging Face Inference Providers with
+`HUGGINGFACEHUB_API_TOKEN` and `IMAGE_MODEL_ID`. Every remote provider downloads
+and runs nothing locally. `IMAGE_TIMEOUT_SECONDS` (default 45) is a total
+per-image deadline enforced by all adapters. `huggingface` does not support
+`edit_image`; use `cloudflare` or `hosted` when the compliance loop must revise
+an existing asset.
 
 Startup seeds the policy documents and re-embeds them when `EMBEDDER` changes.
 `EMBEDDER=fake` is the default and needs no model files. `EMBEDDER=huggingface`
@@ -98,16 +102,16 @@ uv run --no-dev uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
 Set `ASSET_STORAGE=cloudinary`, `TRUST_PROXY=true`, the Cloudinary credentials,
-the Render Postgres/Key Value URLs and the deployed `FRONTEND_ORIGIN`. Use the
-HTTP health check at `/health`.
+the Render Postgres/Key Value URLs, the deployed `FRONTEND_ORIGIN`, and either
+`IMAGE_PROVIDER=cloudflare` with its account/token or another image backend. Use
+the HTTP health check at `/health`.
 
 ## Image model benchmark
 
 `benchmarks/image_models.py` compares remote open-weight text-to-image models on
 five fixed prompts. It calls Hugging Face Inference Providers (`hf-inference`);
 no model weights are downloaded. A live run needs `HUGGINGFACEHUB_API_TOKEN` and
-asks for confirmation before making any requests. Janus is not offered by
-`hf-inference`; use a dedicated hosted endpoint if you need it.
+asks for confirmation before making any requests.
 
 ```bash
 uv run python -m benchmarks.image_models --dry-run

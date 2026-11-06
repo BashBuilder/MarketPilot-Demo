@@ -8,7 +8,7 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-ImageProvider = Literal["fake", "hosted", "huggingface"]
+ImageProvider = Literal["fake", "hosted", "huggingface", "cloudflare"]
 SearchProviderName = Literal["fake"]
 EmbedderName = Literal["fake", "huggingface"]
 AssetStorageName = Literal["local", "cloudinary"]
@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     image_api_key: SecretStr | None = None
     image_model_id: str = Field(default="stabilityai/sdxl-turbo", min_length=1)
     image_timeout_seconds: float = Field(default=45.0, gt=0)
+    cloudflare_account_id: str | None = None
+    cloudflare_api_token: SecretStr | None = None
+    cloudflare_image_model: str = Field(
+        default="@cf/black-forest-labs/flux-1-schnell", min_length=1
+    )
+    cloudflare_edit_model: str = Field(
+        default="@cf/runwayml/stable-diffusion-v1-5-img2img", min_length=1
+    )
     search_provider: SearchProviderName = "fake"
     embedder: EmbedderName = "fake"
     hf_embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", min_length=1)
