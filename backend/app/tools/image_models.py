@@ -7,7 +7,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 MAX_IMAGE_DIMENSION = 2048
 DEFAULT_IMAGE_SIZE: tuple[int, int] = (256, 256)
+# The seed is persisted in a BIGINT column, so derived seeds must fit int64.
+MAX_SEED = 2**63 - 1
 _CHECKSUM_PATTERN = r"^[0-9a-f]{64}$"
+
+
+def seed_from_digest(digest: bytes) -> int:
+    """Fold digest bytes into a non-negative seed PostgreSQL can store."""
+    return int.from_bytes(digest[:8], "big") & MAX_SEED
+
 
 type Dimension = Annotated[int, Field(ge=1, le=MAX_IMAGE_DIMENSION)]
 type Size = tuple[Dimension, Dimension]

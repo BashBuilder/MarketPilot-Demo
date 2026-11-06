@@ -16,6 +16,7 @@ from designer_support import (
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.agents.designer import DesignerAgent
+from app.agents.designer_targets import seed_for
 from app.agents.outputs import ComplianceItem, ComplianceReport, CreativeDirection
 from app.agents.prompts.loader import load_prompt
 from app.core.errors import GuardrailViolation
@@ -155,3 +156,11 @@ async def test_generation_is_limited_to_one_image(
 
 def test_designer_prompt_is_versioned() -> None:
     assert load_prompt("designer").version == "2"
+
+
+def test_derived_seeds_are_stable_and_fit_the_database() -> None:
+    prompts = [f"Editorial still life number {number}" for number in range(50)]
+    seeds = [seed_for(prompt, number) for number, prompt in enumerate(prompts)]
+
+    assert seeds == [seed_for(prompt, number) for number, prompt in enumerate(prompts)]
+    assert all(0 <= seed <= 2**63 - 1 for seed in seeds)

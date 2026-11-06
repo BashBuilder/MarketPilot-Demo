@@ -137,8 +137,12 @@ async def test_linear_workflow_persists_outputs_checkpoints_and_events(
     assert stored_run.current_node == "human"
 
     expected_events = [event for _ in PIPELINE for event in ("agent_started", "agent_handoff")]
-    expected_events.append("awaiting_approval")
-    assert event_names(emitter) == expected_events
+    # Tool calls interleave with the agent events, so compare the agent feed only.
+    agent_events = [
+        name for name in event_names(emitter) if name in {"agent_started", "agent_handoff"}
+    ]
+    assert agent_events == expected_events
+    assert event_names(emitter)[-1] == "awaiting_approval"
     handoffs = [data for name, data in emitter.events if name == "agent_handoff"]
     assert [data["from"] for data in handoffs] == list(PIPELINE)
     assert [data["to"] for data in handoffs] == EXPECTED_TARGETS
