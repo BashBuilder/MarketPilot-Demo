@@ -105,14 +105,19 @@ export const creativeScore = z.object({
   total: z.number().min(0).max(100),
 });
 
+/**
+ * A version may be snapshotted at the human gate before every agent finishes,
+ * so the backend sends `null` for sections that were never produced. Keep the
+ * keys required and only the values nullable: a missing key is still a bug.
+ */
 export const campaignPackage = z.object({
-  brief: campaignBrief,
-  research: audienceResearch,
-  copy: adCopySet,
-  direction: creativeDirection,
-  assets: assetSet,
-  compliance: complianceReport,
-  score: creativeScore,
+  brief: campaignBrief.nullable(),
+  research: audienceResearch.nullable(),
+  copy: adCopySet.nullable(),
+  direction: creativeDirection.nullable(),
+  assets: assetSet.nullable(),
+  compliance: complianceReport.nullable(),
+  score: creativeScore.nullable(),
 });
 
 export type CampaignBrief = z.infer<typeof campaignBrief>;

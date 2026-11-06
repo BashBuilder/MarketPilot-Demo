@@ -98,7 +98,7 @@ describe("useRunStream terminal events", () => {
     },
   );
 
-  it("still reconnects after a drop following a recoverable error", () => {
+  it("stays on the native connection after a drop following a recoverable error", () => {
     const { result, source } = setup();
 
     act(() => source.emitEvent(recoverableError));
@@ -106,9 +106,10 @@ describe("useRunStream terminal events", () => {
     expect(result.current.status).toBe("open");
 
     act(() => source.fail());
+    expect(source.closed).toBe(false);
     expect(result.current.status).toBe("reconnecting");
 
-    act(() => vi.advanceTimersByTime(1000));
-    expect(FakeEventSource.instances).toHaveLength(2);
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(FakeEventSource.instances).toHaveLength(1);
   });
 });

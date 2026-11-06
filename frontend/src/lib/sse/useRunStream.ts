@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { sseEvent, type SseEvent, type SseEventType } from "@/lib/schemas";
 import { API_BASE_URL } from "@/lib/api/client";
 import { applySseEvent, createRunState, type RunState } from "./reducer";
@@ -17,8 +17,8 @@ const EVENT_TYPES: readonly SseEventType[] = [
   "error",
 ];
 
-const RECONNECT_BASE_MS = 1000;
-const RECONNECT_MAX_MS = 15000;
+/** A long model call is normal; only a stream silent this long is a stall. */
+export const DEFAULT_STALL_AFTER_MS = 75_000;
 
 export type RunStreamStatus = "connecting" | "open" | "reconnecting" | "closed";
 
@@ -34,22 +34,23 @@ export function isTerminalEvent(event: SseEvent): boolean {
   return event.event === "error" && !event.data.recoverable;
 }
 
+export interface RunStreamOptions {
+  /** How long an open stream may stay silent before it is flagged as stalled. */
+  stallAfterMs?: number;
+}
+
 export interface RunStream {
   state: RunState;
   status: RunStreamStatus;
+  stalled: boolean;
 }
 
 type ParseResult =
   | { ok: true; event: SseEvent }
   | { ok: false; reason: string };
 
-export function runStreamUrl(runId: string, lastEventId: string | null): string {
-  const url = `${API_BASE_URL}/runs/${encodeURIComponent(runId)}/stream`;
-  // EventSource cannot set request headers, so a manual reconnect carries the
-  // cursor in the query string; native reconnects still send Last-Event-ID.
-  return lastEventId === null
-    ? url
-    : `${url}?last_event_id=${encodeURIComponent(lastEventId)}`;
+export function runStreamUrl(runId: string): string {
+  return `${API_BASE_URL}/runs/${encodeURIComponent(runId)}/stream`;
 }
 
 function parseEvent(
@@ -81,90 +82,92 @@ function parseEvent(
  * Opens the run's SSE stream, validates every event and folds it into a pure
  * run state. Bad payloads are recorded, never thrown, so one bad frame cannot
  * take the live view down.
+ *
+ * Unexpected drops are left to the browser's native EventSource reconnect so
+ * the Last-Event-ID header is sent automatically. Closing and reopening with a
+ * query parameter would drop that cursor.
  */
-export function useRunStream(runId: string): RunStream {
+export function useRunStream(
+  runId: string,
+  { stallAfterMs = DEFAULT_STALL_AFTER_MS }: RunStreamOptions = {},
+): RunStream {
   const [state, setState] = useState<RunState>(() => createRunState(runId));
   const [status, setStatus] = useState<RunStreamStatus>("connecting");
-  const lastEventIdRef = useRef<string | null>(null);
+  const [stalled, setStalled] = useState(false);
 
   // Pointing the hook at another run resets derived state during render, which
   // React supports for prop changes and keeps the effect free of cascades.
   if (state.runId !== runId) {
     setState(createRunState(runId));
     setStatus("connecting");
+    setStalled(false);
   }
 
   useEffect(() => {
     let disposed = false;
-    let source: EventSource | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let attempts = 0;
     let terminal = false;
+    let stallTimer: ReturnType<typeof setTimeout> | null = null;
 
-    lastEventIdRef.current = null;
+    const clearStallTimer = () => {
+      if (stallTimer !== null) {
+        clearTimeout(stallTimer);
+        stallTimer = null;
+      }
+    };
+
+    const armStallTimer = () => {
+      clearStallTimer();
+      setStalled(false);
+      if (stallAfterMs <= 0) return;
+      stallTimer = setTimeout(() => setStalled(true), stallAfterMs);
+    };
 
     const closeAsTerminal = (stream: EventSource) => {
       terminal = true;
-      if (retryTimer !== null) {
-        clearTimeout(retryTimer);
-        retryTimer = null;
-      }
+      clearStallTimer();
+      setStalled(false);
       stream.close();
       setStatus("closed");
     };
 
-    const connect = () => {
-      if (disposed) return;
-      setStatus(attempts > 0 ? "reconnecting" : "connecting");
-      const stream = new EventSource(
-        runStreamUrl(runId, lastEventIdRef.current),
-      );
-      source = stream;
+    const stream = new EventSource(runStreamUrl(runId));
 
-      stream.onopen = () => {
-        attempts = 0;
-        setStatus("open");
-      };
-
-      stream.onerror = () => {
-        stream.close();
-        if (disposed || terminal) return;
-        setStatus("reconnecting");
-        const delay = Math.min(
-          RECONNECT_BASE_MS * 2 ** attempts,
-          RECONNECT_MAX_MS,
-        );
-        attempts += 1;
-        retryTimer = setTimeout(connect, delay);
-      };
-
-      for (const type of EVENT_TYPES) {
-        stream.addEventListener(type, (raw: Event) => {
-          const message = raw as MessageEvent<string>;
-          const result = parseEvent(type, message);
-          if (!result.ok) {
-            setState((previous) =>
-              withMalformedEvent(previous, message.data, result.reason),
-            );
-            return;
-          }
-          lastEventIdRef.current = result.event.id;
-          setState((previous) => applySseEvent(previous, result.event));
-          if (isTerminalEvent(result.event)) {
-            closeAsTerminal(stream);
-          }
-        });
-      }
+    stream.onopen = () => {
+      setStatus("open");
+      armStallTimer();
     };
 
-    connect();
+    stream.onerror = () => {
+      if (disposed || terminal) return;
+      clearStallTimer();
+      setStalled(false);
+      setStatus("reconnecting");
+    };
+
+    for (const type of EVENT_TYPES) {
+      stream.addEventListener(type, (raw: Event) => {
+        const message = raw as MessageEvent<string>;
+        armStallTimer();
+        const result = parseEvent(type, message);
+        if (!result.ok) {
+          setState((previous) =>
+            withMalformedEvent(previous, message.data, result.reason),
+          );
+          return;
+        }
+        setState((previous) => applySseEvent(previous, result.event));
+        if (isTerminalEvent(result.event)) {
+          closeAsTerminal(stream);
+        }
+      });
+    }
 
     return () => {
       disposed = true;
-      if (retryTimer !== null) clearTimeout(retryTimer);
-      source?.close();
+      clearStallTimer();
+      stream.close();
     };
-  }, [runId]);
+  }, [runId, stallAfterMs]);
 
-  return { state, status };
+  return { state, status, stalled };
 }

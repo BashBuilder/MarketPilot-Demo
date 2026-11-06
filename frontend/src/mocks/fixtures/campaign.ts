@@ -1,5 +1,4 @@
 import type {
-  CampaignPackage,
   CampaignSummary,
   VersionDiff,
   VersionSummary,
@@ -43,8 +42,8 @@ export const versionSummaryTwo: VersionSummary = {
   score: 91,
 };
 
-export const versionOne: CampaignPackage = haircarePackage;
-export const versionTwo: CampaignPackage = revisedPackage;
+export const versionOne = haircarePackage;
+export const versionTwo = revisedPackage;
 
 export const revisionDiff: VersionDiff = {
   from: 1,

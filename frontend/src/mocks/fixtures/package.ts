@@ -11,7 +11,10 @@ import {
   haircareScore,
 } from "./package-visuals";
 
-export const haircarePackage: CampaignPackage = {
+// `satisfies` keeps the fixture's non-null section types after the contract
+// allowed partially produced versions, so mock code can still read sections
+// directly; the schema still validates the shape.
+export const haircarePackage = {
   brief: haircareBrief,
   research: haircareResearch,
   copy: { variants: haircareCopy },
@@ -19,9 +22,9 @@ export const haircarePackage: CampaignPackage = {
   assets: { assets: haircareAssets },
   compliance: haircareCompliance,
   score: haircareScore,
-};
+} satisfies CampaignPackage;
 
-export const revisedPackage: CampaignPackage = {
+export const revisedPackage = {
   ...haircarePackage,
   copy: {
     variants: haircareCopy.map((variant, index) =>
@@ -39,4 +42,4 @@ export const revisedPackage: CampaignPackage = {
     },
     total: 91,
   },
-};
+} satisfies CampaignPackage;

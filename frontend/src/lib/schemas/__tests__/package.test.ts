@@ -101,6 +101,25 @@ describe("campaign package schemas", () => {
     expect(campaignPackage.safeParse(haircarePackage).success).toBe(true);
   });
 
+  it("parses a partially produced package with null sections", () => {
+    const partial = {
+      ...haircarePackage,
+      brief: null,
+      copy: null,
+      direction: null,
+      assets: null,
+      compliance: null,
+      score: null,
+    };
+    expect(campaignPackage.safeParse(partial).success).toBe(true);
+  });
+
+  it("still rejects a package with a missing section key", () => {
+    const partial = { ...haircarePackage } as Partial<typeof haircarePackage>;
+    delete partial.brief;
+    expect(campaignPackage.safeParse(partial).success).toBe(false);
+  });
+
   it("keeps failed compliance items in the package shape", () => {
     const compliance = {
       items: [{ check: "Guaranteed repair", passed: false, reason: "Absolute claim." }],

@@ -128,11 +128,18 @@ export default async function VersionPage({ params }: VersionPageProps) {
         <BriefCard brief={campaignPackage.brief} />
         <ResearchCard research={campaignPackage.research} />
         <CopyCard
-          copy={campaignPackage.copy.variants}
+          copy={campaignPackage.copy?.variants ?? null}
           className="lg:col-span-2"
         />
+        {campaignPackage.direction ? null : (
+          <EmptyState
+            className="lg:col-span-2"
+            title="No creative direction yet"
+            description="The Creative Director agent has not produced direction for this version."
+          />
+        )}
         <AssetGrid
-          assets={campaignPackage.assets.assets}
+          assets={campaignPackage.assets?.assets ?? null}
           direction={campaignPackage.direction}
           className="lg:col-span-2"
         />
