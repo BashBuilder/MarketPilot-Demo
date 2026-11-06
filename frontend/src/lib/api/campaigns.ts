@@ -1,7 +1,7 @@
 import {
   campaignDetail,
   campaignList,
-  campaignVersion,
+  campaignPackage,
   createCampaignRequest,
   createCampaignResponse,
   versionDiff,
@@ -49,7 +49,7 @@ export function getVersion(
 ) {
   return apiRequest(
     `/campaigns/${encodeURIComponent(campaignId)}/versions/${version}`,
-    campaignVersion,
+    campaignPackage,
     { signal },
   );
 }

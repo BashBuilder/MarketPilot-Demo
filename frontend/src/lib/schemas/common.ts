@@ -20,11 +20,20 @@ export const agentName = z.enum([
 
 export type AgentName = z.infer<typeof agentName>;
 
+/**
+ * Event envelopes also identify the human approval gate as `human`; pipeline
+ * agents remain limited to `agentName`.
+ */
+export const eventActor = z.union([agentName, z.literal("human")]);
+
+export type EventActor = z.infer<typeof eventActor>;
+
+/** Mirrors the backend `CampaignStatus` enum. */
 export const campaignStatus = z.enum([
   "draft",
   "running",
   "awaiting_approval",
-  "approved",
+  "completed",
   "failed",
 ]);
 

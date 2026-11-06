@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   approveRunRequest,
+  approveRunResponse,
   createCampaignRequest,
   createCampaignResponse,
   reviseRunRequest,
-  runActionResponse,
+  reviseRunResponse,
 } from "@/lib/schemas";
 
 describe("run schemas", () => {
@@ -51,15 +52,29 @@ describe("run schemas", () => {
     ).toBe(false);
   });
 
-  it("accepts a run action response and rejects an unknown status", () => {
+  it("accepts the backend approval response", () => {
+    expect(
+      approveRunResponse.safeParse({ status: "completed", version: 1 }).success,
+    ).toBe(true);
+    expect(
+      approveRunResponse.safeParse({ status: "approved", version: 1 }).success,
+    ).toBe(false);
+    expect(approveRunResponse.safeParse({ status: "completed" }).success).toBe(
+      false,
+    );
+  });
+
+  it("accepts the backend revision response", () => {
     const response = {
       run_id: "0f8fad5b-d9cb-469f-a165-70867728950e",
-      status: "approved",
-      version: 1,
+      version: 2,
     };
-    expect(runActionResponse.safeParse(response).success).toBe(true);
+    expect(reviseRunResponse.safeParse(response).success).toBe(true);
     expect(
-      runActionResponse.safeParse({ ...response, status: "pending" }).success,
+      reviseRunResponse.safeParse({ ...response, run_id: undefined }).success,
+    ).toBe(false);
+    expect(
+      reviseRunResponse.safeParse({ ...response, version: 0 }).success,
     ).toBe(false);
   });
 });

@@ -21,7 +21,13 @@
   --font-sans: var(--font-geist-sans);
   --font-heading: var(--font-geist-sans);
 
-  /* 4px base grid, with named steps for editorial layout rhythm. */
+  /*
+   * 4px base grid, with named steps for editorial layout rhythm.
+   *
+   * These keys shadow Tailwind's named `max-w-*` sizes: `max-w-3xl` resolves
+   * to `--spacing-3xl` (4rem) rather than `--container-3xl` (48rem). Use an
+   * explicit length such as `max-w-[48rem]` for content widths.
+   */
   --spacing: 0.25rem;
   --spacing-3xs: 0.125rem;
   --spacing-2xs: 0.25rem;

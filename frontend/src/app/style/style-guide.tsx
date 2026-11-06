@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { Inbox } from "lucide-react";
 import { EmptyState } from "@/components/states/empty-state";
 import { ErrorState } from "@/components/states/error-state";
@@ -281,12 +282,12 @@ function StateExamples() {
           title="No campaigns yet"
           description="Start with a brief; the agents will return a full package for review."
           action={
-            <a
+            <Link
               href="/campaigns/new"
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
               Create a campaign
-            </a>
+            </Link>
           }
         />
 

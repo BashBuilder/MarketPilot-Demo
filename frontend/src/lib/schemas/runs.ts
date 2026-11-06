@@ -19,11 +19,13 @@ export const reviseRunRequest = z.object({
   target_node: agentName.optional(),
 });
 
-export const runActionStatus = z.enum(["approved", "revision_requested"]);
+export const approveRunResponse = z.object({
+  status: z.literal("completed"),
+  version: z.number().int().positive(),
+});
 
-export const runActionResponse = z.object({
+export const reviseRunResponse = z.object({
   run_id: uuid,
-  status: runActionStatus,
   version: z.number().int().positive(),
 });
 
@@ -31,4 +33,5 @@ export type CreateCampaignInput = z.infer<typeof createCampaignRequest>;
 export type CreateCampaignResult = z.infer<typeof createCampaignResponse>;
 export type ApproveRunInput = z.infer<typeof approveRunRequest>;
 export type ReviseRunInput = z.infer<typeof reviseRunRequest>;
-export type RunActionResult = z.infer<typeof runActionResponse>;
+export type ApproveRunResult = z.infer<typeof approveRunResponse>;
+export type ReviseRunResult = z.infer<typeof reviseRunResponse>;

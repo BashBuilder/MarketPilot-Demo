@@ -22,7 +22,7 @@ describe("SiteHeader", () => {
     render(<SiteHeader />);
 
     expect(
-      screen.getByRole("link", { name: "MarketPilot home" }),
+      screen.getByRole("link", { name: "M MarketPilot home" }),
     ).toHaveAttribute("href", "/");
 
     const nav = screen.getByRole("navigation", { name: "Primary" });
@@ -70,7 +70,7 @@ describe("SiteHeader", () => {
 
     await user.tab();
     expect(
-      screen.getByRole("link", { name: "MarketPilot home" }),
+      screen.getByRole("link", { name: "M MarketPilot home" }),
     ).toHaveFocus();
 
     await user.tab();

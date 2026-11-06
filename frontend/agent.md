@@ -71,40 +71,49 @@ Base path `/api/v1`, configured through `NEXT_PUBLIC_API_URL`. All bodies are JS
 **Endpoints**
 
 - `POST /campaigns` with `{ idea: string }` returns `{ campaign_id, run_id }`
-- `GET /campaigns` returns a list of campaigns
-- `GET /campaigns/{id}` returns the campaign with its latest version
-- `GET /campaigns/{id}/versions` returns the version list
-- `GET /campaigns/{id}/versions/{n}` returns the full package for a version
-- `GET /campaigns/{id}/versions/{a}/diff/{b}` returns changed fields between two versions
-- `POST /runs/{run_id}/approve` with `{ comment?: string }`
-- `POST /runs/{run_id}/revise` with `{ comment: string, target_node?: string }`
+- `GET /campaigns` returns `CampaignSummary[]`
+- `GET /campaigns/{id}` returns one `CampaignSummary`
+- `GET /campaigns/{id}/versions` returns `VersionSummary[]`, oldest first: `{ version, parent_version_id, score, created_at }`
+- `GET /campaigns/{id}/versions/{n}` returns the full `CampaignPackage` for that version (no wrapper and no run metadata)
+- `GET /campaigns/{id}/versions/{a}/diff/{b}` returns `{ from, to, changes: [{ path, before, after }] }`
+- `POST /runs/{run_id}/approve` with `{ comment?: string }` returns `{ status: "completed", version }`
+- `POST /runs/{run_id}/revise` with `{ comment: string, target_node?: string }` returns `{ run_id, version }`; `run_id` is the continuation run
 - `GET /runs/{run_id}/stream` returns an SSE stream
-- `GET /health` returns 200
+- `GET /health` returns 200 at the root and under `/api/v1`
+
+**Campaign summary shape** (items in `GET /campaigns` and the body of `GET /campaigns/{id}`)
+`{ id, idea, status, latest_version: number | null, latest_score: number | null, active_run_id: string | null, created_at, updated_at }`
+
+`status` is one of `draft`, `running`, `awaiting_approval`, `completed`, `failed`. `active_run_id` is the newest run that has not completed or failed.
 
 **SSE events** (each has `id`, `event`, and JSON `data` with `run_id`, `timestamp`, `agent`)
 
 - `agent_started`
 - `agent_handoff` (from, to)
-- `tool_called` (tool, duration_ms, status)
+- `tool_called` (tool, duration_ms, status; status is `success`, `error`, or `denied`)
 - `validation_failed` (reason)
 - `retrying` (attempt, max_attempts)
 - `awaiting_approval` (version)
-- `completed` (version, score)
+- `completed` (version, score; score may be null)
 - `error` (message, recoverable)
 
-**Campaign summary shape** (items in `GET /campaigns`, and the top of `GET /campaigns/{id}`)
-`{ id, idea, status, latest_version: number | null, latest_score: number | null, active_run_id: string | null, created_at, updated_at }`
+`agent` is one of the eight pipeline agents (`brief`, `research`, `copywriter`, `creative_director`, `designer`, `compliance`, `reviewer`, `supervisor`) or `human` for the approval gate and completion. Handoffs may target `human`.
 
 **Stream behavior**
 
 - The `id` of each SSE event is opaque and increasing; clients send the last one back as `Last-Event-ID`.
 - The server closes the stream after a terminal event: `awaiting_approval`, `completed`, or `error` with `recoverable: false`.
 - Clients must not reconnect after a terminal event. They reconnect only after an unexpected drop.
-- `GET /health` exists at the root and under `/api/v1`.
 
-Clients can reconnect with `Last-Event-ID` and resume.
+**Package shape (per version):**
 
-**Package shape (per version):** `brief`, `research`, `copy` (variants per channel), `direction`, `assets` (uri, checksum, model, seed, prompt), `compliance` (items with pass/fail and reason), `score` (per-dimension scores, justifications, total).
+- `brief`: `{ product, goal, audience, tone, channels, constraints }`
+- `research`: `{ segments, pain_points, messaging_angles, sources }`, sources are `{ title, url }`
+- `copy`: `{ variants }`, each variant is `{ channel, headline, description, cta }`
+- `direction`: `{ style_guide, composition, image_prompts, video_prompts, negative_prompts }`
+- `assets`: `{ assets }`, each asset is `{ uri, checksum, model, seed, prompt }`
+- `compliance`: `{ items }`, each item is `{ check, passed, reason }`
+- `score`: five dimensions (`brief_alignment`, `audience_fit`, `copy_quality`, `visual_quality`, `compliance_risk`), each `{ score, justification }`, plus `total`
 
 **Errors:** `{ error: { code, message, details? } }` with the matching HTTP status.
 

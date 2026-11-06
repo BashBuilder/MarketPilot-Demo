@@ -2,103 +2,127 @@ import { z } from "zod";
 import { text } from "./common";
 
 export const campaignBrief = z.object({
-  product: text,
-  goal: text,
-  audience: text,
-  tone: text,
+  product: z.string().min(2),
+  goal: z.string().min(5),
+  audience: z.string().min(5),
+  tone: z.string().min(3),
   channels: z.array(text).min(1),
-  constraints: z.array(text),
+  constraints: z.array(text).min(1),
 });
 
 export const audienceSegment = z.object({
-  name: text,
-  description: text,
-  pain_points: z.array(text).min(1),
-  messaging_angles: z.array(text).min(1),
+  name: z.string().min(2),
+  description: z.string().min(5),
+});
+
+export const researchSource = z.object({
+  title: z.string().min(1).max(300),
+  // Only http(s) links may become anchors in the UI; this blocks javascript:
+  // and other executable URL schemes from backend data.
+  url: z
+    .string()
+    .url()
+    .regex(/^https?:\/\//i, "must be an http(s) URL"),
 });
 
 export const audienceResearch = z.object({
-  summary: text,
   segments: z.array(audienceSegment).min(1),
+  pain_points: z.array(text).min(1),
+  messaging_angles: z.array(text).min(1),
+  sources: z.array(researchSource).min(1),
 });
 
 export const copyVariant = z.object({
-  channel: text,
-  headline: text,
-  description: text,
-  cta: text,
+  channel: z.string().min(2),
+  headline: z.string().min(5),
+  description: z.string().min(10),
+  cta: z.string().min(2),
+});
+
+/** The backend groups copy in an `AdCopySet` object, not a bare array. */
+export const adCopySet = z.object({
+  variants: z.array(copyVariant).min(1),
 });
 
 export const creativeDirection = z.object({
-  concept: text,
-  style_guide: text,
-  composition: text,
+  style_guide: z.string().min(5),
+  composition: z.string().min(5),
   image_prompts: z.array(text).min(1),
-  video_prompts: z.array(text).optional(),
-  negative_prompts: z.array(text),
+  video_prompts: z.array(text).min(1),
+  negative_prompts: z.array(text).min(1),
 });
 
-export const assetKind = z.enum(["image", "video"]);
-
 export const asset = z.object({
-  uri: text,
-  checksum: text,
-  model: text,
-  seed: z.number().int(),
-  prompt: text,
-  kind: assetKind.optional(),
-  width: z.number().int().positive().optional(),
-  height: z.number().int().positive().optional(),
-  alt_text: text.optional(),
+  uri: z
+    .string()
+    .min(5)
+    .regex(/^\S+$/, "must not contain whitespace"),
+  checksum: z.string().regex(/^[0-9a-fA-F]{64}$/, "must be 64 hex characters"),
+  model: z.string().min(2),
+  seed: z.number().int().nonnegative(),
+  prompt: z.string().min(5),
+});
+
+/** The backend groups generated files in an `AssetSet` object. */
+export const assetSet = z.object({
+  assets: z.array(asset).min(1),
 });
 
 export const complianceItem = z.object({
-  claim: text,
-  status: z.enum(["pass", "fail"]),
-  reason: text,
-  policy: text.optional(),
+  check: z.string().min(3),
+  passed: z.boolean(),
+  reason: z.string().min(5),
 });
 
 export const complianceReport = z.object({
-  passed: z.boolean().optional(),
-  items: z.array(complianceItem),
+  items: z.array(complianceItem).min(1),
 });
 
-export const scoreDimensionKey = z.enum([
+/** Fixed backend dimension keys, in rubric order. */
+export const scoreDimensionKeys = [
   "brief_alignment",
   "audience_fit",
   "copy_quality",
   "visual_quality",
   "compliance_risk",
-]);
+] as const;
 
 export const scoreDimension = z.object({
-  dimension: scoreDimensionKey,
   score: z.number().min(0).max(10),
-  justification: text,
+  justification: z
+    .string()
+    .min(5)
+    .max(200)
+    .regex(/^[^\r\n]*$/, "must be a single line"),
 });
 
 export const creativeScore = z.object({
-  dimensions: z.array(scoreDimension).min(1),
+  brief_alignment: scoreDimension,
+  audience_fit: scoreDimension,
+  copy_quality: scoreDimension,
+  visual_quality: scoreDimension,
+  compliance_risk: scoreDimension,
   total: z.number().min(0).max(100),
-  recommendation: text.optional(),
 });
 
 export const campaignPackage = z.object({
   brief: campaignBrief,
   research: audienceResearch,
-  copy: z.array(copyVariant).min(1),
+  copy: adCopySet,
   direction: creativeDirection,
-  assets: z.array(asset),
+  assets: assetSet,
   compliance: complianceReport,
   score: creativeScore,
 });
 
 export type CampaignBrief = z.infer<typeof campaignBrief>;
+export type ResearchSource = z.infer<typeof researchSource>;
 export type AudienceResearch = z.infer<typeof audienceResearch>;
 export type CopyVariant = z.infer<typeof copyVariant>;
+export type AdCopySet = z.infer<typeof adCopySet>;
 export type CreativeDirection = z.infer<typeof creativeDirection>;
 export type Asset = z.infer<typeof asset>;
+export type AssetSet = z.infer<typeof assetSet>;
 export type ComplianceReport = z.infer<typeof complianceReport>;
 export type CreativeScore = z.infer<typeof creativeScore>;
 export type CampaignPackage = z.infer<typeof campaignPackage>;

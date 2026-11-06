@@ -5,6 +5,7 @@ import {
   reviseRunRequest,
 } from "@/lib/schemas";
 import { serializeSse } from "./fixtures";
+import { mirrorCreatedCampaign } from "./bridge";
 import { approveMockRun, reviseMockRun } from "./run-actions";
 import { mockStore } from "./store";
 
@@ -37,7 +38,9 @@ export const handlers = [
     if (!parsed.success) {
       return fail(422, "validation_error", "Invalid campaign idea", parsed.error.issues);
     }
-    return HttpResponse.json(mockStore.createCampaign(parsed.data.idea), {
+    const created = mockStore.createCampaign(parsed.data.idea);
+    await mirrorCreatedCampaign(parsed.data.idea, created);
+    return HttpResponse.json(created, {
       status: 201,
     });
   }),

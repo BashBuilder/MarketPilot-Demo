@@ -25,13 +25,14 @@ afterAll(() => server.close());
 beforeEach(() => resetMockStore());
 
 describe("API client against the mock API", () => {
-  it("lists the seeded campaign and reads its latest package", async () => {
+  it("lists the seeded campaign and reads its summary", async () => {
     const campaigns = await listCampaigns();
     expect(campaigns).toHaveLength(1);
     expect(campaigns[0].id).toBe(campaignId);
 
     const detail = await getCampaign(campaignId);
-    expect(detail.latest_package?.brief.product).toContain("Aurelia");
+    expect(detail.latest_version).toBe(1);
+    expect(detail.active_run_id).toBe(runId);
   });
 
   it("creates a campaign, then exposes it with version 1", async () => {
@@ -44,34 +45,35 @@ describe("API client against the mock API", () => {
     expect(await listVersions(created.campaign_id)).toHaveLength(1);
   });
 
-  it("reads a full version", async () => {
+  it("reads a full version package", async () => {
     const version = await getVersion(campaignId, 1);
-    expect(version.version).toBe(1);
-    expect(version.package.score.total).toBe(86);
+    expect(version.score.total).toBe(86);
+    expect(version.copy.variants[0].channel).toBe("instagram");
   });
 
   it("approves a run", async () => {
     const result = await approveRun(runId, { comment: "Ship it" });
-    expect(result.status).toBe("approved");
+    expect(result.status).toBe("completed");
     expect(result.version).toBe(1);
-    expect((await getCampaign(campaignId)).status).toBe("approved");
+    expect((await getCampaign(campaignId)).status).toBe("completed");
   });
 
-  it("revises a run into version 2 and exposes the diff", async () => {
+  it("revises a run into version 2 and exposes the new run", async () => {
     const result = await reviseRun(runId, {
       comment: "Sharper hook",
       target_node: "copywriter",
     });
-    expect(result.status).toBe("revision_requested");
     expect(result.version).toBe(2);
-    expect(await listVersions(campaignId)).toHaveLength(2);
+    const versions = await listVersions(campaignId);
+    expect(versions).toHaveLength(2);
+    expect(versions[1].parent_version_id).not.toBeNull();
 
     const version = await getVersion(campaignId, 2);
-    expect(version.parent_version).toBe(1);
-    expect(version.package.copy[0].headline).toContain("commute");
+    expect(version.copy.variants[0].headline).toContain("commute");
 
     const diff = await getVersionDiff(campaignId, 1, 2);
     expect(diff.changes.length).toBeGreaterThan(0);
+    expect(diff.changes[0].path).toContain("copy");
   });
 
   it("validates the revision comment before sending", async () => {

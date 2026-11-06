@@ -14,33 +14,29 @@ import {
 export const haircarePackage: CampaignPackage = {
   brief: haircareBrief,
   research: haircareResearch,
-  copy: haircareCopy,
+  copy: { variants: haircareCopy },
   direction: haircareDirection,
-  assets: haircareAssets,
+  assets: { assets: haircareAssets },
   compliance: haircareCompliance,
   score: haircareScore,
 };
 
 export const revisedPackage: CampaignPackage = {
   ...haircarePackage,
-  copy: haircareCopy.map((variant, index) =>
-    index === 0
-      ? { ...variant, headline: "Shine that lasts past the commute" }
-      : variant,
-  ),
+  copy: {
+    variants: haircareCopy.map((variant, index) =>
+      index === 0
+        ? { ...variant, headline: "Shine that lasts past the commute" }
+        : variant,
+    ),
+  },
   score: {
     ...haircareScore,
-    dimensions: haircareScore.dimensions.map((dimension) =>
-      dimension.dimension === "copy_quality"
-        ? {
-            ...dimension,
-            score: 9,
-            justification:
-              "The revised hook is more distinctive while staying within the claims policy.",
-          }
-        : dimension,
-    ),
+    copy_quality: {
+      score: 9,
+      justification:
+        "The revised hook is more distinctive while staying within the claims policy.",
+    },
     total: 91,
-    recommendation: "Ready for human approval.",
   },
 };
