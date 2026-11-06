@@ -109,7 +109,7 @@ Base path `/api/v1`, configured through `NEXT_PUBLIC_API_URL`. All bodies are JS
 
 **Package shape (per version):**
 
-Every key is always present. A section is `null` when the version was snapshotted at the human gate before that agent produced it. The UI must render an explicit per-section "not produced" state for a `null` section; it must not reject the whole package or drop the field.
+A version may be snapshotted at the human gate before every agent finishes. The backend serializes it with `response_model_exclude_none`, so an unproduced section arrives either as `null` or omitted entirely. The UI must render an explicit per-section "not produced" state in both cases; it must not reject the whole package or drop the field.
 
 - `brief`: `{ product, goal, audience, tone, channels, constraints } | null`
 - `research`: `{ segments, pain_points, messaging_angles, sources } | null`, sources are `{ title, url }`
@@ -118,6 +118,8 @@ Every key is always present. A section is `null` when the version was snapshotte
 - `assets`: `{ assets } | null`, each asset is `{ uri, checksum, model, seed, prompt }`
 - `compliance`: `{ items } | null`, each item is `{ check, passed, reason }`
 - `score`: five dimensions (`brief_alignment`, `audience_fit`, `copy_quality`, `visual_quality`, `compliance_risk`), each `{ score, justification }`, plus `total`; the whole score is `null` until the Reviewer produces it
+
+Asset `seed` is a 64-bit integer and may exceed `Number.MAX_SAFE_INTEGER`. JSON clients receive an imprecise `Number`, so validate it as a non-negative integer without enforcing the safe-integer cap; never reject the package because of a large seed.
 
 **Errors:** `{ error: { code, message, details? } }` with the matching HTTP status.
 

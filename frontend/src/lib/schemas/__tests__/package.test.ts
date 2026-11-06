@@ -114,10 +114,18 @@ describe("campaign package schemas", () => {
     expect(campaignPackage.safeParse(partial).success).toBe(true);
   });
 
-  it("still rejects a package with a missing section key", () => {
+  it("parses a partially produced package with omitted sections", () => {
     const partial = { ...haircarePackage } as Partial<typeof haircarePackage>;
     delete partial.brief;
-    expect(campaignPackage.safeParse(partial).success).toBe(false);
+    delete partial.score;
+    expect(campaignPackage.safeParse(partial).success).toBe(true);
+  });
+
+  it("accepts backend image seeds above the JavaScript safe integer range", () => {
+    const seed = 12_121_485_059_587_893_276;
+    expect(
+      asset.safeParse({ ...haircarePackage.assets.assets[0], seed }).success,
+    ).toBe(true);
   });
 
   it("keeps failed compliance items in the package shape", () => {

@@ -59,7 +59,10 @@ export const asset = z.object({
     .regex(/^\S+$/, "must not contain whitespace"),
   checksum: z.string().regex(/^[0-9a-fA-F]{64}$/, "must be 64 hex characters"),
   model: z.string().min(2),
-  seed: z.number().int().nonnegative(),
+  // Backend seeds are 64-bit integers and can exceed Number.MAX_SAFE_INTEGER.
+  // `z.number().int()` rejects them, so keep the integer check without the
+  // safe-range cap. JavaScript has already rounded the value by JSON.parse.
+  seed: z.number().nonnegative().refine(Number.isInteger, "must be an integer"),
   prompt: z.string().min(5),
 });
 
@@ -106,18 +109,18 @@ export const creativeScore = z.object({
 });
 
 /**
- * A version may be snapshotted at the human gate before every agent finishes,
- * so the backend sends `null` for sections that were never produced. Keep the
- * keys required and only the values nullable: a missing key is still a bug.
+ * A version may be snapshotted at the human gate before every agent finishes.
+ * The backend serializes those versions with `response_model_exclude_none`, so
+ * an unproduced section arrives either as `null` or omitted entirely.
  */
 export const campaignPackage = z.object({
-  brief: campaignBrief.nullable(),
-  research: audienceResearch.nullable(),
-  copy: adCopySet.nullable(),
-  direction: creativeDirection.nullable(),
-  assets: assetSet.nullable(),
-  compliance: complianceReport.nullable(),
-  score: creativeScore.nullable(),
+  brief: campaignBrief.nullish(),
+  research: audienceResearch.nullish(),
+  copy: adCopySet.nullish(),
+  direction: creativeDirection.nullish(),
+  assets: assetSet.nullish(),
+  compliance: complianceReport.nullish(),
+  score: creativeScore.nullish(),
 });
 
 export type CampaignBrief = z.infer<typeof campaignBrief>;
