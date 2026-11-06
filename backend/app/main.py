@@ -106,18 +106,18 @@ async def _seed_policies() -> None:
 
 
 class _FrontendOriginAllowlist(Collection[str]):
-    """Resolve the single allowed origin lazily so imports need no config."""
+    """Resolve the allowed origins lazily so imports need no config."""
 
     def __contains__(self, origin: object) -> bool:
         if origin == "*":
             return False
-        return isinstance(origin, str) and origin == get_settings().frontend_origin
+        return isinstance(origin, str) and origin.rstrip("/") in get_settings().frontend_origins
 
     def __iter__(self) -> Iterator[str]:
-        yield get_settings().frontend_origin
+        return iter(get_settings().frontend_origins)
 
     def __len__(self) -> int:
-        return 1
+        return len(get_settings().frontend_origins)
 
 
 async def health() -> dict[str, str]:

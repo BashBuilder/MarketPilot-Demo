@@ -38,6 +38,10 @@ five times that budget. Set `TRUST_PROXY=true` only behind a proxy that sets
 (default 3) rejects new campaigns and revisions with `429 too_many_runs` while
 that many runs are executing.
 
+`FRONTEND_ORIGIN` is a comma-separated CORS allowlist, defaulting to
+`http://localhost:3000` and `https://marketpilot-demo-frontend.vercel.app`.
+Trailing slashes are ignored and wildcards are rejected.
+
 Each run's Redis stream is capped at `EVENT_STREAM_MAXLEN` entries and expires
 `EVENT_STREAM_TTL_SECONDS` after a terminal event. With
 `RESUME_ON_STARTUP=true`, startup claims runs left `running` with a short Redis

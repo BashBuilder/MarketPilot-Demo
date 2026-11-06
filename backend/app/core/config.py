@@ -65,8 +65,21 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = Field(default=20, ge=1)
     max_concurrent_runs: int = Field(default=3, ge=1)
     trust_proxy: bool = False
-    frontend_origin: str = "http://localhost:3000"
+    frontend_origin: str = "http://localhost:3000,https://marketpilot-demo-frontend.vercel.app"
     log_level: LogLevel = "INFO"
+
+    @property
+    def frontend_origins(self) -> tuple[str, ...]:
+        """Parse the comma-separated allowlist, stripping trailing slashes.
+
+        Browsers send the ``Origin`` header without a trailing slash, so an
+        operator pasting the deployed URL must not silently break CORS.
+        """
+        return tuple(
+            origin
+            for origin in (part.strip().rstrip("/") for part in self.frontend_origin.split(","))
+            if origin
+        )
 
 
 @lru_cache(maxsize=1)

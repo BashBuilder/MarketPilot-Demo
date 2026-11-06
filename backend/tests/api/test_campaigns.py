@@ -8,6 +8,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.dependencies import RecordingRunLauncher
+from app.core.config import get_settings
 from app.database.repositories import versions
 
 
@@ -114,3 +115,32 @@ async def test_cors_allows_only_the_frontend_origin(client: AsyncClient) -> None
     denied = await client.get("/api/v1/health", headers={"Origin": "http://other.test"})
     assert denied.status_code == 200
     assert "access-control-allow-origin" not in denied.headers
+
+
+async def test_cors_allows_every_listed_origin(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    origins = (
+        "http://localhost:3000",
+        "https://marketpilot-demo-frontend.vercel.app",
+    )
+    monkeypatch.setenv("FRONTEND_ORIGIN", ",".join(origins))
+    get_settings.cache_clear()
+
+    for origin in origins:
+        allowed = await client.get("/api/v1/health", headers={"Origin": origin})
+        assert allowed.headers["access-control-allow-origin"] == origin
+
+
+async def test_cors_tolerates_a_trailing_slash_in_config(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    origin = "https://marketpilot-demo-frontend.vercel.app"
+    monkeypatch.setenv("FRONTEND_ORIGIN", f"http://localhost:3000,{origin}/")
+    get_settings.cache_clear()
+
+    allowed = await client.get("/api/v1/health", headers={"Origin": origin})
+
+    assert allowed.headers["access-control-allow-origin"] == origin
