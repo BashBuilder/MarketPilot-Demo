@@ -9,7 +9,6 @@ burning more of the run's image budget.
 
 import random
 from collections.abc import Callable, Sequence
-from pathlib import Path
 
 from app.agents.base import BaseAgent, EventEmitter, LLMClient, ToolInvoker
 from app.agents.designer_targets import (
@@ -119,7 +118,7 @@ class DesignerAgent(BaseAgent[AssetSet]):
         for number in sorted(flagged):
             current = assets[number - 1]
             instruction = revision_instruction(failed, current, number)
-            args = EditImageArgs(image_path=Path(current.uri), instruction=instruction)
+            args = EditImageArgs(image_path=current.uri, instruction=instruction)
             raw = await tools.call(_EDIT, args.model_dump())
             assets[number - 1] = to_asset(GeneratedImage.model_validate(raw), settings.asset_dir)
         return AssetSet(assets=assets)

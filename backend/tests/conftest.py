@@ -11,6 +11,7 @@ from app.core.config import get_settings
 def _fake_image_provider(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Keep tests off remote image services even when ``.env`` selects one."""
     monkeypatch.setenv("IMAGE_PROVIDER", "fake")
+    monkeypatch.setenv("ASSET_STORAGE", "local")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

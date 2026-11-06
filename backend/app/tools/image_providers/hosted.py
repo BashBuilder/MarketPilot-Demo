@@ -67,8 +67,8 @@ class HostedImageGenerator:
             prompt=prompt,
         )
 
-    async def edit(self, image_path: Path, instruction: str) -> GeneratedImage:
-        source = read_source(image_path, self._asset_dir)
+    async def edit(self, image_path: Path | str, instruction: str) -> GeneratedImage:
+        source = read_source(Path(image_path), self._asset_dir)
         data = await self._post(
             f"{self._api_url}/edit",
             {"instruction": instruction, "image_base64": base64.b64encode(source).decode()},

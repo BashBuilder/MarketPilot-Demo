@@ -54,6 +54,9 @@ def test_settings_load_from_environment(monkeypatch: pytest.MonkeyPatch) -> None
     assert settings.event_stream_ttl_seconds == 86400
     assert settings.resume_on_startup is True
     assert settings.asset_dir == Path("assets")
+    assert settings.asset_storage == "local"
+    assert settings.cloudinary_cloud_name is None
+    assert settings.cloudinary_folder == "marketpilot"
     assert settings.search_provider == "fake"
     assert settings.cost_cap_per_run == 3.5
     assert settings.image_provider == "fake"

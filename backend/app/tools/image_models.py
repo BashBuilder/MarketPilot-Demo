@@ -23,6 +23,8 @@ class GeneratedImage(BaseModel):
     model: Annotated[str, Field(min_length=2)]
     seed: Annotated[int, Field(ge=0)]
     prompt: Annotated[str, Field(min_length=1)]
+    # Public URI assigned by the asset store; the local path stays the working copy.
+    uri: str | None = None
 
 
 class GenerateImageArgs(BaseModel):
@@ -41,7 +43,7 @@ class EditImageArgs(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    image_path: Path
+    image_path: str | Path
     instruction: Annotated[str, Field(min_length=5, max_length=2000)]
 
 
@@ -56,4 +58,4 @@ class ImageGenerator(Protocol):
         size: Size,
     ) -> GeneratedImage: ...
 
-    async def edit(self, image_path: Path, instruction: str) -> GeneratedImage: ...
+    async def edit(self, image_path: Path | str, instruction: str) -> GeneratedImage: ...

@@ -45,8 +45,8 @@ class FakeImageGenerator:
         key = f"generate:{prompt}:{negative_prompt}:{seed}:{width}x{height}"
         return self._write(data, key=key, seed=seed, prompt=prompt)
 
-    async def edit(self, image_path: Path, instruction: str) -> GeneratedImage:
-        source = self._resolve_source(image_path)
+    async def edit(self, image_path: Path | str, instruction: str) -> GeneratedImage:
+        source = self._resolve_source(Path(image_path))
         try:
             source_bytes = source.read_bytes()
         except OSError as exc:

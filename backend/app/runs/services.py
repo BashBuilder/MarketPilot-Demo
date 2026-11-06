@@ -23,6 +23,7 @@ from app.harness.guardrails import RunGuardrails
 from app.harness.middleware import ToolCallMiddleware
 from app.harness.registry import AgentName, ToolRegistry
 from app.llm.embeddings import get_embedder
+from app.tools.asset_storage import StoredImageGenerator, build_asset_storage
 from app.tools.image_providers import build_image_generator
 from app.tools.image_tools import register_image_tools
 from app.tools.policy_tools import register_policy_tools
@@ -49,7 +50,8 @@ def build_tool_registry(
     """Register the tools the pipeline may use; the allowlist still applies."""
     registry = ToolRegistry()
     register_search_tools(registry, FakeSearchProvider())
-    register_image_tools(registry, build_image_generator(settings))
+    generator = StoredImageGenerator(build_image_generator(settings), build_asset_storage(settings))
+    register_image_tools(registry, generator)
     register_policy_tools(
         registry,
         session_factory=session_factory,

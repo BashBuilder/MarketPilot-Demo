@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from app.agents.outputs import Asset, ComplianceItem
+from app.tools.asset_storage import relative_uri
 from app.tools.image_models import GeneratedImage
 
 _ASSET_INDEX = re.compile(r"(?:assets?|images?)\s+#?(\d+)", re.IGNORECASE)
@@ -14,9 +15,9 @@ _MAX_INSTRUCTION = 2000
 
 
 def to_asset(image: GeneratedImage, asset_dir: Path) -> Asset:
-    """Record exactly the metadata the image tool returned."""
+    """Record the published URI when storage assigned one, else the local path."""
     return Asset(
-        uri=asset_uri(image.path, asset_dir),
+        uri=image.uri or asset_uri(image.path, asset_dir),
         checksum=image.checksum,
         model=image.model,
         seed=image.seed,
@@ -26,11 +27,7 @@ def to_asset(image: GeneratedImage, asset_dir: Path) -> Asset:
 
 def asset_uri(path: Path, asset_dir: Path) -> str:
     """Prefer a portable relative URI so verification resolves under asset_dir."""
-    resolved = path.resolve()
-    try:
-        return resolved.relative_to(asset_dir.resolve()).as_posix()
-    except ValueError:
-        return resolved.as_posix()
+    return relative_uri(path, asset_dir)
 
 
 def seed_for(prompt: str, index: int) -> int:

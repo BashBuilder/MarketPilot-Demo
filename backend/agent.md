@@ -34,6 +34,7 @@ The Supervisor routes between nodes. A failed node goes through the retry policy
 - LangGraph and LangChain for orchestration (CrewAI only for comparison spikes)
 - Primary LLM: DeepSeek through an OpenAI-compatible client (`langchain-openai`)
 - Image generation: hosted open-weight model via Hugging Face Inference Providers behind an `ImageGenerator` interface; no local weights or inference
+- Asset storage: behind an `AssetStorage` interface; local files for development, Cloudinary uploads with public URLs in production
 - Video generation: optional. Evaluate open-source models; if none is practical, keep a stub and skip video
 - PostgreSQL with `pgvector`, SQLAlchemy (async) with `asyncpg`, Alembic migrations
 - Redis for caching, pubsub and run locks

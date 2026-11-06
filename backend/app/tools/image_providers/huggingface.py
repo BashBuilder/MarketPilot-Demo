@@ -62,7 +62,7 @@ class HuggingFaceImageGenerator:
             prompt=prompt,
         )
 
-    async def edit(self, image_path: Path, instruction: str) -> GeneratedImage:
+    async def edit(self, image_path: Path | str, instruction: str) -> GeneratedImage:
         del image_path, instruction
         raise ToolError(
             "the Hugging Face image provider only supports text-to-image generation",
