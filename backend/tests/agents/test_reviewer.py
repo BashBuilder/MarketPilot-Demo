@@ -52,6 +52,38 @@ async def test_reviewer_scores_with_policy_context(
     assert rows[0].status == "success"
 
 
+async def test_overlong_justification_retries_with_feedback(
+    session_factory: async_sessionmaker[AsyncSession],
+    run_id: UUID,
+) -> None:
+    policy = FakePolicy()
+    tools = make_tools(session_factory, run_id, policy=policy)
+    too_long = {
+        **SCORE,
+        "brief_alignment": {
+            "score": 8,
+            "justification": "A" * 201,
+        },
+    }
+    fake = FakeLLMClient([too_long, SCORE])
+    sleeps = SleepRecorder()
+
+    result = await ReviewerAgent().run(
+        review_state(),
+        fake,
+        tools=tools,
+        settings=settings(retry_max_attempts=2),
+        sleep=sleeps,
+        jitter=lambda: 0.0,
+    )
+
+    assert result.total == 76.0
+    assert len(fake.requests) == 2
+    feedback = fake.requests[1].messages[-1]["content"]
+    assert "brief_alignment.justification" in feedback
+    assert "at most 200 characters" in feedback
+
+
 async def test_total_mismatch_retries_with_feedback(
     session_factory: async_sessionmaker[AsyncSession],
     run_id: UUID,
