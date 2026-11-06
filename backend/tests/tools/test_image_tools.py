@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from app.core.errors import GuardrailViolation, ToolError
 from app.harness.registry import ToolRegistry
+from app.tools.image_models import MAX_SEED, seed_from_digest
 from app.tools.image_tools import (
     EditImageArgs,
     FakeImageGenerator,
@@ -99,6 +100,11 @@ def test_non_designer_agents_are_denied(tmp_path: Path, agent: str, tool: str) -
 
     with pytest.raises(GuardrailViolation, match="may not use"):
         registry.get_tool(agent, tool)  # type: ignore[arg-type]
+
+
+def test_seed_from_digest_stays_within_the_bigint_range() -> None:
+    assert seed_from_digest(b"\xff" * 32) == MAX_SEED
+    assert seed_from_digest(b"\x00" * 32) == 0
 
 
 def test_args_reject_invalid_values() -> None:

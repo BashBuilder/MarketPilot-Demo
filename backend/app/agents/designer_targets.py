@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.agents.outputs import Asset, ComplianceItem
 from app.tools.asset_storage import relative_uri
-from app.tools.image_models import GeneratedImage
+from app.tools.image_models import GeneratedImage, seed_from_digest
 
 _ASSET_INDEX = re.compile(r"(?:assets?|images?)\s+#?(\d+)", re.IGNORECASE)
 _ASSET_WORD = re.compile(r"\b(?:assets?|images?)\b", re.IGNORECASE)
@@ -33,7 +33,7 @@ def asset_uri(path: Path, asset_dir: Path) -> str:
 def seed_for(prompt: str, index: int) -> int:
     """Derive a stable seed so regenerating the same direction is idempotent."""
     digest = hashlib.sha256(f"{index}:{prompt}".encode()).digest()
-    return int.from_bytes(digest[:8], "big")
+    return seed_from_digest(digest)
 
 
 def flagged_indices(

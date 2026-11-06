@@ -17,6 +17,7 @@ from app.tools.image_models import (
     GenerateImageArgs,
     ImageGenerator,
     Size,
+    seed_from_digest,
 )
 from app.tools.image_png import color_for_seed, is_png, png_bytes, png_size
 
@@ -61,9 +62,8 @@ class FakeImageGenerator:
             )
 
         source_checksum = hashlib.sha256(source_bytes).hexdigest()
-        seed = int.from_bytes(
-            hashlib.sha256(f"{source_checksum}:{instruction}".encode()).digest()[:8],
-            "big",
+        seed = seed_from_digest(
+            hashlib.sha256(f"{source_checksum}:{instruction}".encode()).digest()
         )
         width, height = png_size(source_bytes)
         data = png_bytes(width, height, color_for_seed(seed))
