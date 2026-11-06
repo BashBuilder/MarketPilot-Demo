@@ -54,7 +54,7 @@ class _CombinedValidator[T]:
 
 
 class BaseAgent[T: BaseModel]:
-    """Base for the pipeline agents defined in section 4 of the backend guide."""
+    """Base for the pipeline agents defined in section 7 of the backend guide."""
 
     name: AgentName
     output_model: type[T]

@@ -2,6 +2,7 @@
 
 from app.core.config import Settings
 from app.tools.image_models import ImageGenerator
+from app.tools.image_providers.cloudflare import CloudflareImageGenerator
 from app.tools.image_providers.hosted import HostedImageGenerator
 from app.tools.image_providers.huggingface import HuggingFaceImageGenerator
 from app.tools.image_tools import FakeImageGenerator
@@ -39,6 +40,26 @@ def build_image_generator(settings: Settings) -> ImageGenerator:
         return HuggingFaceImageGenerator(
             model_id=settings.image_model_id,
             api_key=token,
+            asset_dir=settings.asset_dir,
+            timeout=settings.image_timeout_seconds,
+        )
+
+    if settings.image_provider == "cloudflare":
+        account_id = (settings.cloudflare_account_id or "").strip()
+        token = (
+            settings.cloudflare_api_token.get_secret_value()
+            if settings.cloudflare_api_token
+            else ""
+        )
+        if not account_id or not token:
+            raise RuntimeError(
+                "IMAGE_PROVIDER=cloudflare requires CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN"
+            )
+        return CloudflareImageGenerator(
+            account_id=account_id,
+            api_key=token,
+            model_id=settings.cloudflare_image_model,
+            edit_model_id=settings.cloudflare_edit_model,
             asset_dir=settings.asset_dir,
             timeout=settings.image_timeout_seconds,
         )

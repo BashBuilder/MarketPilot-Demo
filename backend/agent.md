@@ -1,104 +1,41 @@
-# Backend Agent: MarketPilot
+# Backend Agent: MarketPilot Build Playbook
 
-You are the **Backend Agent**. You own everything inside `backend/`: the multi-agent workflow, the harness, the database, the API, and the infrastructure to run them. You do NOT touch `frontend/`. The frontend agent builds against the API contract in section 2; if the contract must change, update section 2 in both `backend/agent.md` and `frontend/agent.md` in the same commit.
+You own `backend/`. The frontend builds against the contract in section 2; backend is the source of truth for it. Implement one phase at a time, meet its checks, commit, then continue.
 
-**Rule zero:** implement ONE step at a time. Finish its "Done when" criteria, commit, then move on. Never start step N+1 while step N is red.
-
-**Core idea:** agent = LLM + harness. The LLM reasons; the harness provides memory and state persistence, context and token management, a verified execution loop, and guardrails with human approval.
+**Core idea:** agent = LLM + harness. The LLM reasons; the harness owns state, context, verification, retries, budgets, checkpoints and the human gate.
 
 ---
 
-## 1. Project Architecture
+## 1. What the backend is
 
-### 1.1 What the backend does
-
-Accepts a campaign idea such as "Create an advertising campaign for a fictional hair-care product targeting adults aged 25 to 40" and runs it through a multi-agent pipeline that produces a campaign package: brief, audience research, copy, visual assets, compliance report, and creative score. A human approves or requests revisions. Every revision is a new version.
-
-### 1.2 Workflow (LangGraph state machine)
-
-1. User submits an idea.
-2. Brief Agent structures it into a campaign brief.
-3. Research Agent supplies audience and messaging research.
-4. Copywriter Agent writes headlines, descriptions and CTAs.
-5. Creative Director produces image/video generation instructions.
-6. Designer Agent generates or edits visual assets.
-7. Compliance Agent checks claims and policy restrictions.
-8. Reviewer Agent scores the package.
-9. Human approval gate: approve (done) or request revision (new version, routed to the targeted node).
-
-The Supervisor routes between nodes. A failed node goes through the retry policy, then escalates to the human if retries are exhausted.
-
-### 1.3 Stack
-
-- Python 3.12, FastAPI, `uv` for environment and dependencies
-- LangGraph and LangChain for orchestration (CrewAI only for comparison spikes)
-- Primary LLM: DeepSeek through an OpenAI-compatible client (`langchain-openai`)
-- Image generation: hosted open-weight model via Hugging Face Inference Providers behind an `ImageGenerator` interface; no local weights or inference
-- Asset storage: behind an `AssetStorage` interface; local files for development, Cloudinary uploads with public URLs in production
-- Video generation: optional. Evaluate open-source models; if none is practical, keep a stub and skip video
-- PostgreSQL with `pgvector`, SQLAlchemy (async) with `asyncpg`, Alembic migrations
-- Redis for caching, pubsub and run locks
-- Tests: `pytest`, `pytest-asyncio`, `httpx`
-
-### 1.4 Backend layout
+FastAPI service at `/api/v1` plus a LangGraph pipeline that turns a campaign idea into an immutable campaign package.
 
 ```
-backend/
-  app/
-    main.py
-    api/                routers: campaigns, runs, versions, approvals, stream
-    agents/
-      prompts/          one versioned .md prompt file per agent
-      supervisor.py
-      brief.py
-      research.py
-      copywriter.py
-      creative_director.py
-      designer.py
-      compliance.py
-      reviewer.py
-    graph/
-      workflow.py       graph definition and edges
-      state.py          shared WorkflowState (pydantic)
-      nodes.py          node wrappers that call the harness
-    tools/
-      image_tools.py
-      search_tools.py
-      policy_tools.py
-      export_tools.py
-    harness/
-      registry.py       tool registry and per-agent permissions
-      middleware.py     logging, timing, token accounting
-      guardrails.py     policy enforcement and scopes
-      retries.py        retry, backoff, fallback
-      checkpoints.py    state persistence and human-in-the-loop
-      context.py        token budget and context trimming
-      verification.py   output validators and verify loop
-    evaluation/
-      datasets.py
-      evaluators.py
-      runner.py
-    database/
-      models.py
-      session.py
-      seed.py
-      repositories/
-    core/
-      config.py
-      logging.py
-  migrations/           Alembic
-  tests/
-  pyproject.toml
-  Dockerfile
+POST /campaigns
+  -> campaigns + workflow_runs rows
+  -> background WorkflowRunLauncher
+  -> brief -> research -> copywriter -> creative_director
+     -> designer -> compliance -> reviewer
+  -> compliance failure: rerun copywriter or designer
+  -> score below threshold: rerun the weakest node
+  -> human gate: approve (complete) or revise (new run + new version)
 ```
 
-Repo root (shared, owned by the backend agent for infra files): `docker-compose.yml`, `.env.example`, `README.md`.
+Every successful node writes an immutable `agent_outputs` row, a `workflow_checkpoints` row and an SSE handoff event. Redis carries the event stream; Postgres owns durable state.
 
-Dependency direction: api calls graph, graph calls agents, agents call tools. The harness wraps agents and tools. Agents never import `database` or call external APIs directly; they go through tools and repositories.
+**Stack:** Python 3.12, FastAPI, `uv`, LangGraph/LangChain, DeepSeek via `langchain-openai`, async SQLAlchemy + `asyncpg`, PostgreSQL + `pgvector`, Redis, Alembic, pytest, `ruff`, `mypy --strict`, httpx.
+
+**Providers:**
+
+- LLM: DeepSeek `deepseek-chat` through the OpenAI-compatible API.
+- Images: `fake` (default), `hosted` generic HTTP, `huggingface`, or `cloudflare` Workers AI.
+- Storage: `local` (default) or `cloudinary`.
+- Embeddings: `fake` (default) or `huggingface`; policy vectors are 384-dimensional.
+- Search: `fake` only. Video generation is not wired yet.
 
 ---
 
-## 2. API Contract (shared with the frontend agent)
+## 2. API contract (shared with the frontend agent)
 
 Base path `/api/v1`. All bodies are JSON. Changes here must be mirrored in `frontend/agent.md`.
 
@@ -131,16 +68,6 @@ Base path `/api/v1`. All bodies are JSON. Changes here must be mirrored in `fron
 - `completed` (version, score; score may be null)
 - `error` (message, recoverable)
 
-**Campaign summary shape** (items in `GET /campaigns`, and the top of `GET /campaigns/{id}`)
-`{ id, idea, status, latest_version: number | null, latest_score: number | null, active_run_id: string | null, created_at, updated_at }`
-
-**Stream behavior**
-
-- The `id` of each SSE event is opaque and increasing; clients send the last one back as `Last-Event-ID`.
-- The server closes the stream after a terminal event: `awaiting_approval`, `completed`, or `error` with `recoverable: false`.
-- Clients must not reconnect after a terminal event. They reconnect only after an unexpected drop.
-- `GET /health` exists at the root and under `/api/v1`.
-
 `agent` is one of the eight pipeline agents (`brief`, `research`, `copywriter`, `creative_director`, `designer`, `compliance`, `reviewer`, `supervisor`) or `human` for the approval gate and completion. Handoffs may target `human`.
 
 **Stream behavior**
@@ -163,209 +90,301 @@ Base path `/api/v1`. All bodies are JSON. Changes here must be mirrored in `fron
 
 ---
 
-## 3. Coding Conventions
+## 3. Fresh setup (replicate the current state)
 
-- Fully typed. `mypy --strict` clean on `app/`. Lint and format with `ruff`.
-- Async by default for I/O. No blocking calls inside async functions.
-- Pydantic v2 models at every boundary: API schemas, agent inputs and outputs, tool args, workflow state. No bare dicts crossing module boundaries.
-- Settings only through `pydantic-settings` in `core/config.py`.
-- JSON structured logging with `run_id`, `campaign_id`, `agent`, `step` on every line.
-- Typed exceptions: `ToolError`, `ValidationFailure`, `GuardrailViolation`, `RetryExhausted`. Never swallow exceptions.
-- Prompts live in `agents/prompts/*.md`, not inline strings.
-- Docstrings on public functions explain why, not what.
-- Conventional commits (`feat:`, `fix:`, `test:`, `chore:`). Never commit `.env`.
+Prerequisites: Python 3.12, `uv`, Docker with Compose, and a DeepSeek API key for live runs.
 
----
+From the repository root:
 
-## 4. Agent Responsibilities
+```bash
+docker compose up -d postgres redis
 
-Each agent takes `(WorkflowState, allowed tools)` and returns a Pydantic output model. Agents do not mutate state directly; the node wrapper validates the output and merges it.
+cd backend
+cp .env.example .env          # PowerShell: Copy-Item .env.example .env
+# Set DEEPSEEK_API_KEY in .env. The defaults use fake images/search/embeddings.
 
-- **Supervisor** returns `RouteDecision`. Decides next node, handles revision routing, escalates on repeated failure. Must not generate creative content.
-- **Brief** returns `CampaignBrief`: product, goal, audience, tone, channels, constraints. Must not invent medical or performance claims.
-- **Research** returns `AudienceResearch`: segments, pain points, messaging angles. Must not cite sources it did not retrieve.
-- **Copywriter** returns `AdCopySet`: headlines, descriptions and CTAs, several variants per channel. Must not make unsubstantiated claims.
-- **Creative Director** returns `CreativeDirection`: image/video prompts, style guide, composition, negative prompts. Must not call image tools.
-- **Designer** returns `AssetSet`: generates or edits visuals, records seed, prompt and model. Must not alter copy or direction.
-- **Compliance** returns `ComplianceReport`: flags risky claims, restricted content and missing disclaimers with a pass/fail and reason per item. Flags only; it does not rewrite copy.
-- **Reviewer** returns `CreativeScore`: scores the package and recommends revisions. Must not approve on behalf of the human.
+uv sync                        # add --extra embeddings when EMBEDDER=huggingface
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
+```
 
-**Scoring rubric** (0 to 10 each, one-line justification, weighted total out of 100): brief alignment 20%, audience fit 20%, copy quality 20%, visual quality and brand consistency 20%, compliance risk (inverted) 20%. Below the threshold (default 70) the package routes back to the weakest node, maximum 2 automatic loops, then escalates to the human.
+Startup validates configuration, connects Redis, builds the tool registry and launcher, seeds the three sample policy documents, and idempotently creates the demo campaign `00000000-0000-4000-8000-000000000001`. It also resumes runs left `running` when `RESUME_ON_STARTUP=true`.
 
-**Handoff contract:** a handoff means a validated output written to `WorkflowState`, an SSE event emitted, and a checkpoint persisted. A handoff missing any of the three is a bug.
+Verify:
 
----
+```bash
+curl http://localhost:8000/health
+curl http://localhost:8000/api/v1/health
 
-## 5. Tool Permissions
+curl -X POST http://localhost:8000/api/v1/campaigns \
+  -H 'Content-Type: application/json' \
+  -d '{"idea":"Create an advertising campaign for a fictional hair-care product targeting adults aged 25 to 40"}'
+```
 
-Declared as a per-agent allowlist in `harness/registry.py`. Default deny.
+Use the returned `run_id` with `GET /api/v1/runs/{run_id}/stream`; the run stops at `awaiting_approval`.
 
-- `search_tools`: Research only
-- `policy_lookup` (pgvector, read-only): Copywriter, Compliance, Reviewer
-- `generate_image`, `edit_image`, `generate_video` (optional): Designer only
-- `read_state`: all agents
-- `export_package`: no agent; the API invokes it only after a recorded human approval
+Postgres-backed integration tests are skipped unless a test database is configured:
 
-Rules:
+```bash
+# from the repository root
+docker compose exec postgres psql -U marketpilot -d marketpilot \
+  -c "CREATE DATABASE marketpilot_test;"
 
-- Tools validate arguments with Pydantic and are idempotent where possible.
-- Every tool call is logged: agent, tool, args hash, duration, cost, outcome.
-- Side-effecting tools have per-run call caps set in config.
-- Human approval is required before final export and before any run exceeds the cost cap.
+cd backend
+export TEST_DATABASE_URL=postgresql+asyncpg://marketpilot:marketpilot@localhost:5432/marketpilot_test
+uv run pytest
+```
+
+Only `postgres` and `redis` are active in `docker-compose.yml`; the backend/frontend service blocks are commented out. The backend runs as a plain Python process.
 
 ---
 
-## 6. Database Rules
+## 4. Project structure
 
-- All schema changes go through Alembic migrations. No manual DDL; `create_all` only in tests.
-- Minimum tables: `campaigns`, `workflow_runs`, `workflow_checkpoints`, `agent_outputs`, `campaign_versions`, `assets`, `compliance_reports`, `creative_scores`, `approvals`, `tool_calls`, `policy_documents` (with a vector column).
-- UUID primary keys. `created_at` on every row, `updated_at` on mutable rows.
-- Version history is append-only: a revision creates a new `campaign_versions` row with `parent_version_id`. Never update a prior version.
-- Agent outputs and tool calls are immutable once written.
-- Binaries (images, video) live on disk or object storage. The database stores URI, checksum and generation metadata.
-- Access only through repository functions. No raw SQL in agents or tools, except read-only parameterized queries in policy lookup.
-- One async session per request or run, closed by a context manager. No global sessions.
-- Index every foreign key and `(campaign_id, version)`.
-- `seed.py` loads sample policy documents and a demo campaign, and is idempotent.
+```
+backend/
+  app/
+    main.py                 FastAPI app, lifespan, CORS, health, error handlers
+    api/                    campaigns, versions, runs, stream, schemas, limits, capacity
+    agents/
+      prompts/              versioned .md prompt per LLM agent
+      outputs/              frozen Pydantic output models
+      base.py               prompt + context -> verified output
+      brief.py research.py copywriter.py creative_director.py
+      designer.py compliance.py reviewer.py
+      supervisor.py supervisor_rules.py scoring.py
+      designer_targets.py blocklist.py contracts.py
+    graph/
+      state.py              WorkflowState
+      workflow.py           graph build, drive, resume, revision
+      nodes.py              node wrappers: run, verify, persist, checkpoint, emit
+      node_support.py routing.py versioning.py approvals.py diff.py
+    harness/
+      registry.py middleware.py guardrails.py retries.py
+      checkpoints.py context.py verification.py validators.py
+    tools/
+      search_tools.py policy_tools.py
+      image_tools.py image_models.py image_png.py
+      image_providers/      fake selection, hosted, huggingface, cloudflare, storage
+      asset_storage.py cloudinary_client.py cloudinary_storage.py
+      export_tools.py export_models.py export_files.py
+    llm/                    deepseek.py, embeddings.py
+    runs/                   launcher.py, services.py, startup.py
+    events/                 bus.py, emitter.py, envelope.py
+    database/
+      models/               one module per table
+      repositories/         one module per aggregate
+      session.py seed.py
+    evaluation/             datasets.py evaluators.py golden.py runner.py
+    core/                   config.py errors.py logging.py
+  benchmarks/               image_models.py measure.py
+  migrations/versions/      0001_initial_schema, 0002_policy_embedding_384
+  tests/                    agents api database evaluation graph harness llm runs tools
+  alembic.ini .env.example pyproject.toml README.md agent.md
+```
 
----
-
-## 7. Testing Requirements
-
-- **Unit:** every agent, tool, validator, retry policy and guardrail. LLM and image calls use deterministic fakes.
-- **Harness (mandatory):** retry then succeed, retry exhausted then escalate, guardrail blocks a disallowed tool, context trimming stays under budget, checkpoint resume reproduces state.
-- **Integration:** full graph run with fake LLM and fake image tool against real Postgres. Cover happy path, compliance-fail revision loop, human rejection creating a new version, and crash then resume.
-- **API:** `httpx.AsyncClient` tests for every router, including SSE event ordering and `Last-Event-ID` resume.
-- **Contract:** a test that checks responses against the section 2 shapes so the frontend never breaks silently.
-- **Evaluation:** golden briefs in `evaluation/`; evaluators check schema validity, compliance recall on seeded bad claims, and score stability. Run with `uv run python -m app.evaluation.runner`.
-- Coverage: at least 85% on `harness/` and `graph/`, at least 75% overall.
-- No test calls a live external API unless marked `@pytest.mark.live` (excluded from CI).
-
----
-
-## 8. Security Restrictions
-
-- Secrets only from environment. `.env.example` holds placeholders only.
-- Treat all retrieved, web and user text as untrusted data. Delimit it in prompts. Tool permissions are enforced in code (registry), never by prompt wording.
-- Validate and size-limit all input. Reject on schema failure.
-- Validate outputs before persistence: sanitize copy, verify image MIME, size and checksum.
-- Compliance and Designer refuse or flag disallowed content: unapproved medical claims, guaranteed results, targeting minors, real people's likenesses, copyrighted characters or brands.
-- Rate limit endpoints and cap concurrent runs per user.
-- CORS limited to the known frontend origin; no wildcard in production.
-- No `eval`, `exec` or shell execution from agents. Agents write files only inside the asset directory.
-- Pin dependencies (`uv.lock`) and run `pip-audit` in CI.
-- Never log API keys or full prompts containing personal data; log IDs and hashes.
-- Dockerfile: non-root user, minimal base image, no secrets baked in.
-
----
-
-## 9. Infrastructure Workflow (step by step)
-
-Work strictly in order. Each step: goal, tasks, done when.
-
-### Step 0: Repo and tooling bootstrap
-
-- Create the layout from section 1.4. In `backend/` run `uv init`, then:
-  ```
-  uv add fastapi uvicorn
-  uv add langgraph langchain langchain-openai
-  uv add pydantic pydantic-settings
-  uv add sqlalchemy asyncpg psycopg alembic
-  uv add redis pgvector python-dotenv
-  uv add --dev pytest pytest-asyncio httpx ruff mypy pip-audit
-  ```
-- `docker-compose.yml` with `postgres` (pgvector image), `redis`, `backend`, and a `frontend` service placeholder the frontend agent will fill in.
-- `.env.example`: `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DATABASE_URL`, `REDIS_URL`, `IMAGE_PROVIDER`, `COST_CAP_PER_RUN`, `FRONTEND_ORIGIN`.
-- **Done when:** `docker compose up` starts the services, `GET /health` returns 200, `pytest` runs one placeholder test, `ruff` and `mypy` pass.
-
-### Step 1: Core config and logging
-
-- `core/config.py` and `core/logging.py` with `run_id` context variables.
-- **Done when:** missing required variables fail fast with a clear error; a test asserts `run_id` appears in logs.
-
-### Step 2: Database layer
-
-- Models (section 6), async session, Alembic initial migration, repositories, `seed.py`.
-- **Done when:** `alembic upgrade head` works on a fresh DB; repository tests pass; seed is idempotent; a test confirms versions cannot be mutated.
-
-### Step 3: Workflow state and schemas
-
-- `WorkflowState` and the output model for every agent.
-- **Done when:** state round-trips through serialization; invalid output raises `ValidationFailure`.
-
-### Step 4: LLM client abstraction
-
-- `LLMClient` wrapping DeepSeek with structured output (schema to Pydantic), timeout and token usage. Add a fake client.
-- **Done when:** a structured call returns a validated model; malformed JSON raises a controlled error; token usage is captured.
-
-### Step 5: Harness: registry, guardrails, middleware
-
-- Allowlist from section 5, call caps, and middleware that records every call to `tool_calls`.
-- **Done when:** a disallowed tool call raises `GuardrailViolation`; every call writes a DB row; tests cover allow, deny and cap.
-
-### Step 6: Harness: retries and verification loop
-
-- Exponential backoff with jitter, retry only retryable errors, optional fallback provider. The verifier runs schema and semantic checks after each output and feeds the real error message back into the retry prompt.
-- **Done when:** fail then succeed and fail N times then escalate are both tested.
-
-### Step 7: Harness: context, memory, checkpoints
-
-- Token budgeting that gives each agent only the state it needs. Checkpoints after every node, resume by `run_id`, interrupt and resume for human approval.
-- **Done when:** a simulated crash resumes at the right node; context stays under budget on a long fixture.
-
-### Step 8: Tools
-
-- Search with provenance, pgvector policy lookup, `ImageGenerator` interface with a hosted implementation and a fake, optional video stub, export.
-- **Done when:** each tool has typed args and results, fake-based tests, and image outputs record model, seed, prompt and checksum.
-
-### Step 9: Agents, one at a time
-
-- Order: Brief, Research, Copywriter, Creative Director, Designer, Compliance, Reviewer, Supervisor. Each gets a prompt file, unit tests and an evaluation case.
-- **Done when (per agent):** valid output on fixtures, respects permissions, has a failure-path test.
-
-### Step 10: LangGraph workflow
-
-- Nodes wrap agents through the harness: guardrails, run, verify, checkpoint, emit event. Conditional edges for compliance failure, low score (max 2 loops) and the human gate.
-- **Done when:** integration tests pass for happy path, compliance loop, low-score loop and resume after crash.
-
-### Step 11: Versioning and approvals
-
-- Each package becomes a `campaign_versions` row. Approvals record approve or revise, comment and target node.
-- **Done when:** a rejection with a comment creates version N+1 linked to N; the diff endpoint works; export requires approval.
-
-### Step 12: API and SSE
-
-- Implement every endpoint and event in section 2.
-- **Done when:** httpx tests assert event order for a full run, reconnect with `Last-Event-ID` resumes, and the contract test passes.
-
-### Step 13: Evaluation harness
-
-- Golden dataset, evaluators and runner.
-- **Done when:** the runner works offline with fakes, prints pass rates, and a regression fails CI.
-
-### Step 14: Image and video model exploration
-
-- Benchmark 2 to 3 hosted open-source image models on the same 5 briefs (quality, latency, cost, licence). Evaluate one hosted open-source video model; if impractical, document it and keep the stub. Do not download or run model weights locally.
-- **Done when:** `docs/model-decision.md` records results and the chosen default.
-
-### Step 15: Hardening, CI and deployment
-
-- Review section 8, add rate limiting, harden the Dockerfile, set up CI (ruff, mypy, pytest, pip-audit, migration check), and write the backend README section with setup and run instructions.
-- **Done when:** a fresh clone runs `docker compose up` and the demo campaign completes via the API alone.
+Dependency direction: `api -> graph -> agents -> tools`; the harness wraps agents/tools. Agents never import `database` or call providers directly.
 
 ---
 
-## 10. Definition of Done
+## 5. Configuration
 
-A step is done only when all of these hold:
+`app/core/config.py` uses `pydantic-settings` and fails startup on missing required values. `.env` is gitignored; `.env.example` documents every setting and a test keeps the two in sync.
 
-1. Code follows section 3 and the dependency direction in section 1.4.
-2. Tests pass, including relevant integration tests, and coverage gates are met.
-3. `ruff` and `mypy --strict` report zero errors.
-4. No security restriction in section 8 is violated; no secrets in code or logs.
-5. Database changes are migrations that apply cleanly to a fresh database.
-6. Every agent and tool action is logged; handoffs emit SSE events and checkpoints.
-7. Failure paths exist and are tested (retry, escalation, guardrail denial).
-8. The API contract in section 2 is unchanged, or updated in both agent files.
-9. Docs updated, conventional commit made, CI green.
-10. The step's own "Done when" criteria are demonstrably met.
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `DEEPSEEK_API_KEY` | required | Provider key. |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | OpenAI-compatible endpoint. |
+| `DATABASE_URL` | required | `postgresql+asyncpg://...`; append `?ssl=require` for external Postgres. |
+| `REDIS_URL` | required | Event bus and rate-limit counters. |
+| `EVENT_STREAM_MAXLEN` | `2000` | Max events retained per run stream. |
+| `EVENT_STREAM_TTL_SECONDS` | `86400` | Stream expiry after a terminal event. |
+| `RESUME_ON_STARTUP` | `true` | Claim and resume runs left `running`. |
+| `IMAGE_PROVIDER` | `fake` | `fake`, `hosted`, `huggingface`, `cloudflare`. |
+| `IMAGE_API_URL`, `IMAGE_API_KEY` | unset | Required for `hosted`. |
+| `IMAGE_MODEL_ID` | `stabilityai/sdxl-turbo` | Hugging Face image model. |
+| `IMAGE_TIMEOUT_SECONDS` | `45` | Total per-image deadline for every remote provider. |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | unset | Required for `cloudflare`. |
+| `CLOUDFLARE_IMAGE_MODEL` | `@cf/black-forest-labs/flux-1-schnell` | Workers AI text-to-image model. |
+| `CLOUDFLARE_EDIT_MODEL` | `@cf/runwayml/stable-diffusion-v1-5-img2img` | Workers AI img2img model. |
+| `SEARCH_PROVIDER` | `fake` | Only `fake` is implemented. |
+| `EMBEDDER` | `fake` | `fake` or `huggingface`. |
+| `HF_EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | 384-dimensional output. |
+| `HUGGINGFACEHUB_API_TOKEN` | unset | Required for `EMBEDDER=huggingface` and image `huggingface`. |
+| `ASSET_DIR` | `assets` | Local working copy for generated files. |
+| `ASSET_STORAGE` | `local` | `local` or `cloudinary`. |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | unset | Required for `cloudinary`. |
+| `CLOUDINARY_FOLDER`, `CLOUDINARY_TIMEOUT_SECONDS` | `marketpilot`, `30` | Upload folder and deadline. |
+| `COST_CAP_PER_RUN` | `2.0` | Guardrail for projected/actual tool spend. |
+| `MAX_IMAGE_CALLS_PER_RUN` | `8` | Shared cap across generate/edit/video calls. |
+| `MAX_GENERATED_IMAGES_PER_RUN` | `2` | Prompts used per Designer run. |
+| `MAX_SEARCH_CALLS_PER_RUN` | `20` | Research search cap. |
+| `MAX_IMAGE_PROMPT_LENGTH` | `1000` | Validated prompt limit. |
+| `RETRY_MAX_ATTEMPTS` | `3` | Verification retries before escalation. |
+| `SCORE_THRESHOLD` | `70` | Below this the Reviewer loops to the weakest node. |
+| `MAX_AUTO_LOOPS` | `2` | Shared compliance/score loop budget. |
+| `MAX_IDEA_LENGTH`, `MAX_COMMENT_LENGTH` | `2000`, `2000` | Input limits. |
+| `RATE_LIMIT_PER_MINUTE` | `20` | Writes per client IP; reads get 5x. |
+| `MAX_CONCURRENT_RUNS` | `3` | New campaigns/revisions return `429 too_many_runs` above this. |
+| `TRUST_PROXY` | `false` | Trust `X-Forwarded-For` only behind a known proxy. |
+| `FRONTEND_ORIGIN` | `http://localhost:3000,https://marketpilot-demo-frontend.vercel.app` | Comma-separated CORS allowlist; no wildcards. |
+| `LOG_LEVEL` | `INFO` | JSON logs with run/campaign/agent context. |
+
+---
+
+## 6. Data model
+
+All schema changes go through Alembic; `create_all` is for tests only. Access tables through `app/database/repositories`, never raw SQL from agents/tools (the read-only policy lookup is the exception).
+
+| Table | Key columns | Rules |
+| --- | --- | --- |
+| `campaigns` | `id`, `idea`, `status`, `created_at`, `updated_at` | Status: `draft/running/awaiting_approval/completed/failed`. |
+| `workflow_runs` | `id`, `campaign_id`, `status`, `current_node`, `error` | Status: `pending/running/awaiting_approval/completed/failed`. |
+| `workflow_checkpoints` | `id`, `run_id`, `step`, `node`, `state` | Unique `(run_id, step)`; append-only. |
+| `agent_outputs` | `id`, `run_id`, `agent`, `output` | Append-only; one validated output per node. |
+| `campaign_versions` | `id`, `campaign_id`, `version`, `parent_version_id`, `package`, `score` | Unique `(campaign_id, version)`; append-only; DB trigger rejects updates/deletes. |
+| `assets` | `id`, `campaign_version_id`, `kind`, `uri`, `checksum`, `model`, `seed`, `prompt`, `media_type` | Binaries live on disk/object storage; DB stores metadata. |
+| `compliance_reports` | `id`, `campaign_version_id`, `items`, `passed` | One per version. |
+| `creative_scores` | `id`, `campaign_version_id`, `breakdown`, `total` | One per version. |
+| `approvals` | `id`, `run_id`, `campaign_version_id`, `decision`, `comment`, `target_node` | Decision: `approve/revise`. |
+| `tool_calls` | `id`, `run_id`, `agent`, `tool`, `args_hash`, `duration_ms`, `status`, `cost`, `error` | Append-only. |
+| `policy_documents` | `id`, `title`, `source`, `content`, `metadata`, `embedding` | `embedding` is `vector(384)` on PostgreSQL. |
+
+UUID primary keys. `created_at` on every row, `updated_at` on mutable rows. Version history is append-only: a revision adds `version + 1` with `parent_version_id`; prior rows are never updated. PostgreSQL triggers enforce the append-only rule for versions, agent outputs and tool calls.
+
+**Agent output models** (`app/agents/outputs`, frozen, `extra="forbid"`):
+
+| Model | Fields |
+| --- | --- |
+| `CampaignBrief` | product, goal, audience, tone, channels, constraints |
+| `AudienceResearch` | segments `{name, description}`, pain_points, messaging_angles, sources `{title, url}` |
+| `AdCopySet` | variants `{channel, headline, description, cta}` |
+| `CreativeDirection` | image_prompts, video_prompts, style_guide, composition, negative_prompts |
+| `AssetSet` | assets `{uri, checksum, model, seed, prompt}` |
+| `ComplianceReport` | items `{check, passed, reason}` |
+| `CreativeScore` | five dimensions `{score, justification}` + total |
+| `RouteDecision` | next_node, reason, escalate (internal; not in the package) |
+
+`WorkflowState` (`app/graph/state.py`) carries the idea, the seven package sections, `target_node`, `revision_feedback`, `versions`, `status`, `retry_counters` and `errors`.
+
+**Scoring and routing:** each dimension is 0-10 and equally weighted (20%); `total = sum(score * 0.2) * 10` out of 100. `compliance_risk` is inverted (10 = lowest risk). Scores below `SCORE_THRESHOLD` rerun the weakest node. Compliance failures rerun copy first, otherwise visuals. Both loop types share `MAX_AUTO_LOOPS`; when exhausted the run stops at the human gate. Retry exhaustion also stops at the gate.
+
+---
+
+## 7. Agents, tools and guardrails
+
+| Agent | Output | Tools |
+| --- | --- | --- |
+| Brief | `CampaignBrief` | read_state* |
+| Research | `AudienceResearch` | `search_tools`, read_state* |
+| Copywriter | `AdCopySet` | `policy_lookup`, read_state* |
+| Creative Director | `CreativeDirection` | none |
+| Designer | `AssetSet` | `generate_image`, `edit_image`, `generate_video` (unwired), read_state* |
+| Compliance | `ComplianceReport` | `policy_lookup`, read_state* |
+| Reviewer | `CreativeScore` | `policy_lookup`, read_state* |
+| Supervisor | `RouteDecision` | deterministic; no LLM |
+
+\* `read_state` is in the allowlist but not registered as a tool today. `export_package` exists under `app/tools/export_tools.py` but is granted to no agent and has no HTTP endpoint yet. Permissions are enforced by `harness/registry.py` with default deny; never by prompt wording.
+
+Guardrails (`harness/guardrails.py`): image tools share `MAX_IMAGE_CALLS_PER_RUN`; search uses `MAX_SEARCH_CALLS_PER_RUN`; projected/actual spend is capped by `COST_CAP_PER_RUN`. Every call is recorded in `tool_calls` by the middleware. Inputs/outputs and retrieved text are validated at the boundary and fenced with `<untrusted source="...">` blocks.
+
+A handoff is complete only when the validated output, the `agent_outputs` row, the checkpoint and the SSE event all exist.
+
+---
+
+## 8. Build phases
+
+Build in this order; each phase is independently verifiable.
+
+### Phase 1 — Bootstrap and infrastructure
+
+- Create `backend/` with `uv init`; add FastAPI, uvicorn, pydantic, pydantic-settings, SQLAlchemy, asyncpg, psycopg, Alembic, redis, pgvector, LangGraph, LangChain, `langchain-openai`, python-dotenv.
+- Add dev tools: pytest, pytest-asyncio, httpx, ruff, mypy, pip-audit, aiosqlite; optional `embeddings` extra: `langchain-huggingface`.
+- Add `docker-compose.yml` (pgvector Postgres 17, Redis 7), `.env.example`, `.gitignore`, and the minimal `app/main.py` with `/health` and `/api/v1/health`.
+- **Done when:** `docker compose up -d postgres redis` works, `uv run uvicorn app.main:app` starts, both health endpoints return 200, and `ruff`/`mypy` pass.
+
+### Phase 2 — Core services and persistence
+
+- `core/config.py`: validated settings, cached `get_settings()`, comma-separated CORS parsing. `core/logging.py`: JSON logs with run context. `core/errors.py`: typed errors with stable API codes.
+- `database/models/`: all tables and enums from section 6. `database/session.py`: one shared async engine, per-request/run sessions. `database/repositories/`: one module per aggregate. `database/seed.py`: idempotent demo campaign + three policy documents.
+- Alembic `0001_initial_schema` (tables, indexes, pgvector extension, append-only triggers) and `0002_policy_embedding_384`.
+- **Done when:** `uv run alembic upgrade head` succeeds on a fresh database, repository tests pass, seed twice is a no-op, and updating a version/output/tool call is rejected.
+
+### Phase 3 — Contracts, LLM and harness
+
+- `graph/state.py`: `WorkflowState` plus `parse_agent_output`.
+- `agents/outputs/`: frozen Pydantic models from section 6.
+- `llm/deepseek.py`: one structured call per attempt, raw payload returned for verification, JSON-content fallback. `llm/embeddings.py`: fake and Hugging Face embedders.
+- `harness/registry.py`, `guardrails.py`, `middleware.py`: allowlist, caps, audit rows.
+- `harness/retries.py`, `verification.py`, `validators.py`: schema + semantic verification, exponential backoff with jitter, real error text fed into the next attempt.
+- `harness/context.py`, `checkpoints.py`: per-agent token budgets, checkpoint after every node, resume by `run_id`, approval interrupt.
+- **Done when:** failed-then-succeed and exhausted-then-escalate paths pass; a disallowed tool raises `GuardrailViolation`; a long fixture stays within budget; a simulated crash resumes at the right node.
+
+### Phase 4 — Tools
+
+- `search_tools.py` (fake provider, provenance), `policy_tools.py` (pgvector read-only lookup), `image_tools.py` and `image_providers/` (`fake`, `hosted`, `huggingface`, `cloudflare`), `asset_storage.py`/`cloudinary_storage.py` (local + Cloudinary), `export_tools.py` (filesystem export utility).
+- Keep every tool typed and idempotent where possible; record model, seed, prompt and checksum for images.
+- **Done when:** each tool has typed args/results and fake-based tests; image files record metadata; `huggingface` edit is rejected without a network call; Cloudflare handles both raw-byte and base64-JSON responses.
+
+### Phase 5 — Agents, graph and approvals
+
+- Implement the seven LLM agents in this order: Brief, Research, Copywriter, Creative Director, Designer, Compliance, Reviewer. Add the deterministic Supervisor after routing exists. Each LLM agent gets a versioned prompt in `agents/prompts/` and unit tests.
+- `graph/nodes.py`: run through the harness, validate, persist, checkpoint, emit. `graph/workflow.py` and `routing.py`: linear edges, compliance loops, low-score loops, escalation, human gate. `runs/launcher.py`: background execution with a terminal error event; `runs/startup.py`: resume unfinished runs.
+- `graph/versioning.py`: snapshot on approval with append-only version numbers. `graph/approvals.py`: record approve/revise, continue a revision in a new run.
+- **Done when:** integration tests cover the happy path, compliance loop, low-score loop, retry escalation, crash/resume, approve and revise (new version linked to its parent).
+
+### Phase 6 — API, SSE and security
+
+- Implement every endpoint in section 2 with Pydantic schemas and the error envelope.
+- `api/stream.py`: replay after `Last-Event-ID`, heartbeat comments every 5s, close on terminal events.
+- `api/limits.py`: Redis fixed-window rate limits (writes `RATE_LIMIT_PER_MINUTE`, reads 5x). `api/capacity.py`: `MAX_CONCURRENT_RUNS`. CORS uses the `FRONTEND_ORIGIN` allowlist; wildcards are rejected. `TRUST_PROXY` gates `X-Forwarded-For`.
+- **Done when:** httpx tests cover every router, SSE ordering and reconnect; API/schema tests pass; 429s are returned for limits/capacity; no secret or stack trace leaks.
+
+### Phase 7 — Quality, evaluation and deployment
+
+- Tests mirror `app/`: agents, outputs, harness, tools, graph, API, database, evaluation. Postgres tests use `TEST_DATABASE_URL` and the `postgres` marker. No live external API in tests.
+- `app/evaluation/`: golden ideas, bad/clean claim fixtures, evaluators and the offline gate.
+- `benchmarks/image_models.py`: `--dry-run` by default, live run only with `HUGGINGFACEHUB_API_TOKEN` and explicit confirmation.
+- CI (`.github/workflows/backend.yml`): `uv sync --frozen`, ruff check/format, mypy, pytest (Postgres + Redis services), `alembic upgrade head`, `alembic check`, `pip-audit`, evaluation gate.
+- Deployment: plain Python process on Render with `backend` as root; `uv sync --frozen --no-dev`, `alembic upgrade head`, then `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Health check `/health`.
+- **Done when:** a fresh clone can create a campaign, stream it to `awaiting_approval`, approve it, and see the version through the API alone.
+
+---
+
+## 9. Verification commands
+
+Run from `backend/`:
+
+| Purpose | Command |
+| --- | --- |
+| Install | `uv sync` |
+| Run API | `uv run uvicorn app.main:app --reload` |
+| Migrate | `uv run alembic upgrade head` |
+| Drift check | `uv run alembic check` |
+| Tests | `uv run pytest` |
+| Lint | `uv run ruff check .` |
+| Format check | `uv run ruff format --check .` |
+| Types | `uv run mypy app` |
+| Dependencies | `uv run pip-audit` |
+| Offline evaluation | `uv run python -m app.evaluation.runner` |
+| Image benchmark (offline) | `uv run python -m benchmarks.image_models --dry-run` |
+| Seed manually | `uv run python -m app.database.seed` |
+
+CI runs the same gates. Coverage is not enforced by a threshold today; keep new harness and graph branches covered anyway.
+
+---
+
+## 10. Working rules
+
+1. One phase at a time. Meet its checks, commit, then start the next.
+2. Read the existing code and tests before changing them; follow local patterns.
+3. Smallest change that works. No drive-by refactors or dependencies without a reason.
+4. Tests ship with behavior. Bug fixes get a regression test.
+5. Run the real lint/type/test commands before claiming success.
+6. Never commit `.env`, secrets, `node_modules`, `.venv`, build output or generated assets.
+7. Contract changes are stop-and-confirm: update section 2 here and the matching section in `frontend/agent.md` in the same commit.
+8. Conventional commits (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`). Backend and frontend changes in separate commits.
+9. Keep new files under ~150 lines; split modules when they grow.
+10. Ask when requirements are ambiguous or a step cannot be verified.
+
+**Known current limits:** no export HTTP endpoint; `generate_video` is allowlisted but unwired; the `huggingface` image provider cannot edit; `search` and embeddings default to fakes; Docker Compose starts only Postgres and Redis.

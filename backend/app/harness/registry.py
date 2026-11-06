@@ -1,4 +1,4 @@
-"""Tool registry enforcing the per-agent allowlist from agent.md section 5.
+"""Tool registry enforcing the per-agent allowlist from agent.md section 7.
 
 Permissions live in code, not in prompts: default deny, and every lookup goes
 through the registry. A tool the agent may not use is a guardrail violation,

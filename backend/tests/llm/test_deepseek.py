@@ -83,3 +83,35 @@ async def test_a_missing_tool_call_with_a_parse_error_raises() -> None:
 
     with pytest.raises(ValueError, match="no tool call"):
         await client.structured([{"role": "user", "content": "score"}], schema=object)
+
+
+async def test_json_content_is_accepted_when_the_model_skips_the_tool_call() -> None:
+    raw = SimpleNamespace(tool_calls=[], additional_kwargs={}, content='{"total": 82.0}')
+    client = _client({"parsed": None, "raw": raw, "parsing_error": None})
+
+    result = await client.structured([{"role": "user", "content": "score"}], schema=object)
+
+    assert result == {"total": 82.0}
+
+
+async def test_fenced_json_content_is_accepted() -> None:
+    content = '```json\n{"total": 82.0}\n```'
+    raw = SimpleNamespace(tool_calls=[], additional_kwargs={}, content=content)
+    client = _client({"parsed": None, "raw": raw, "parsing_error": None})
+
+    result = await client.structured([{"role": "user", "content": "score"}], schema=object)
+
+    assert result == {"total": 82.0}
+
+
+async def test_empty_tool_arguments_fall_back_to_message_content() -> None:
+    raw = SimpleNamespace(
+        tool_calls=[{"args": {}}],
+        additional_kwargs={},
+        content='{"total": 82.0}',
+    )
+    client = _client({"parsed": None, "raw": raw, "parsing_error": None})
+
+    result = await client.structured([{"role": "user", "content": "score"}], schema=object)
+
+    assert result == {"total": 82.0}

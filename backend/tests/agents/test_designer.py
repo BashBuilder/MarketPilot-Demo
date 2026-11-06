@@ -135,7 +135,7 @@ async def test_image_cap_violation_is_not_retried(
     assert sorted(row.status for row in rows) == ["denied", "success"]
 
 
-async def test_generation_is_limited_to_one_image(
+async def test_generation_is_limited_to_two_images(
     session_factory: async_sessionmaker[AsyncSession],
     run_id: UUID,
     tmp_path: Path,
@@ -148,9 +148,9 @@ async def test_generation_is_limited_to_one_image(
 
     result = await DesignerAgent().run(workflow, tools=tools, settings=limits)
 
-    assert [asset.prompt for asset in result.assets] == prompts[:1]
+    assert [asset.prompt for asset in result.assets] == prompts[:2]
     rows = await audit_rows(session_factory, run_id)
-    assert [row.tool for row in rows] == ["generate_image"]
+    assert [row.tool for row in rows] == ["generate_image", "generate_image"]
     assert all(row.status == "success" for row in rows)
 
 

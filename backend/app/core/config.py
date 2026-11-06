@@ -8,7 +8,7 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-ImageProvider = Literal["fake", "hosted", "huggingface"]
+ImageProvider = Literal["fake", "hosted", "huggingface", "cloudflare"]
 SearchProviderName = Literal["fake"]
 EmbedderName = Literal["fake", "huggingface"]
 AssetStorageName = Literal["local", "cloudinary"]
@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     image_api_key: SecretStr | None = None
     image_model_id: str = Field(default="stabilityai/sdxl-turbo", min_length=1)
     image_timeout_seconds: float = Field(default=45.0, gt=0)
+    cloudflare_account_id: str | None = None
+    cloudflare_api_token: SecretStr | None = None
+    cloudflare_image_model: str = Field(
+        default="@cf/black-forest-labs/flux-1-schnell", min_length=1
+    )
+    cloudflare_edit_model: str = Field(
+        default="@cf/runwayml/stable-diffusion-v1-5-img2img", min_length=1
+    )
     search_provider: SearchProviderName = "fake"
     embedder: EmbedderName = "fake"
     hf_embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", min_length=1)
@@ -54,7 +62,7 @@ class Settings(BaseSettings):
     cloudinary_timeout_seconds: float = Field(default=30.0, gt=0)
     cost_cap_per_run: float = Field(default=2.0, gt=0)
     max_image_calls_per_run: int = Field(default=8, ge=0)
-    max_generated_images_per_run: int = Field(default=1, ge=1)
+    max_generated_images_per_run: int = Field(default=2, ge=1)
     max_search_calls_per_run: int = Field(default=20, ge=0)
     max_image_prompt_length: int = Field(default=1000, ge=1)
     retry_max_attempts: int = Field(default=3, ge=1)
@@ -65,8 +73,21 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = Field(default=20, ge=1)
     max_concurrent_runs: int = Field(default=3, ge=1)
     trust_proxy: bool = False
-    frontend_origin: str = "http://localhost:3000"
+    frontend_origin: str = "http://localhost:3000,https://marketpilot-demo-frontend.vercel.app"
     log_level: LogLevel = "INFO"
+
+    @property
+    def frontend_origins(self) -> tuple[str, ...]:
+        """Parse the comma-separated allowlist, stripping trailing slashes.
+
+        Browsers send the ``Origin`` header without a trailing slash, so an
+        operator pasting the deployed URL must not silently break CORS.
+        """
+        return tuple(
+            origin
+            for origin in (part.strip().rstrip("/") for part in self.frontend_origin.split(","))
+            if origin
+        )
 
 
 @lru_cache(maxsize=1)

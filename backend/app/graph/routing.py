@@ -8,6 +8,7 @@ increments the counter in the real graph state before invoking the agent.
 from collections.abc import Callable, Hashable, Mapping
 
 from app.agents.supervisor import AUTO_LOOP_KEY, route
+from app.agents.supervisor_rules import auto_loops
 from app.core.config import Settings
 from app.graph.nodes import NodeAgent, NodeDependencies, WorkflowNode, make_node
 from app.graph.state import WorkflowState
@@ -51,9 +52,11 @@ def guard_map(next_node: str) -> dict[Hashable, str]:
 
 
 def compliance_map() -> dict[Hashable, str]:
+    # Loop-entry nodes increment the shared automatic-loop counter; routing
+    # straight to the agent would let a persistent failure loop forever.
     paths: dict[Hashable, str] = {
-        "copywriter": "copywriter",
-        "designer": "designer",
+        f"{LOOP_PREFIX}copywriter": f"{LOOP_PREFIX}copywriter",
+        f"{LOOP_PREFIX}designer": f"{LOOP_PREFIX}designer",
         "reviewer": "reviewer",
         APPROVAL_NODE: APPROVAL_NODE,
     }
@@ -84,6 +87,8 @@ def make_compliance_router(settings: Settings) -> NodeRouter:
     A low score from an earlier reviewer pass is still in state while a
     compliance loop runs. Without the explicit failure check, ``route`` would
     keep choosing that stale score's weakest node instead of moving on.
+    Compliance loops share the automatic-loop budget, so a failure that never
+    clears escalates to the human instead of rerunning the pipeline forever.
     """
 
     def choose(state: WorkflowState) -> str:
@@ -94,9 +99,11 @@ def make_compliance_router(settings: Settings) -> NodeRouter:
             return "reviewer"
         if decision.escalate:
             return APPROVAL_NODE
-        if decision.next_node in {"copywriter", "designer"}:
-            return decision.next_node
-        return "reviewer"
+        if decision.next_node not in {"copywriter", "designer"}:
+            return "reviewer"
+        if auto_loops(state) >= settings.max_auto_loops:
+            return APPROVAL_NODE
+        return f"{LOOP_PREFIX}{decision.next_node}"
 
     return choose
 
