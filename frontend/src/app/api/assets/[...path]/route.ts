@@ -6,9 +6,10 @@ interface AssetRouteContext {
 }
 
 /**
- * Same-origin proxy for backend-generated images. The backend contract exposes
- * relative asset URIs but no HTTP asset endpoint, so the frontend serves the
- * shared asset directory when it is configured.
+ * Same-origin proxy for locally stored backend images. Hosted deployments
+ * return absolute Cloudinary URLs, which bypass this route. Local storage still
+ * exposes relative asset URIs but no HTTP asset endpoint, so the frontend serves
+ * the shared asset directory when it is configured.
  */
 export async function GET(
   _request: Request,

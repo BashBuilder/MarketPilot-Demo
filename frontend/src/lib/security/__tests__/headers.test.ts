@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLOUDINARY_ASSET_ORIGIN,
   DEFAULT_API_URL,
   securityHeaders,
   type SecurityHeader,
@@ -40,8 +41,19 @@ describe("securityHeaders", () => {
     expect(policy.get("connect-src")).toContain("https://api.example.com");
     expect(policy.get("img-src")).toContain("'self'");
     expect(policy.get("img-src")).toContain("https://api.example.com");
+    expect(policy.get("img-src")).toContain(CLOUDINARY_ASSET_ORIGIN);
     expect(policy.get("frame-ancestors")).toBe("'none'");
     expect(policy.get("object-src")).toBe("'none'");
+  });
+
+  it("allows Cloudinary-hosted assets without widening fetch access", () => {
+    const headers = headerMap(
+      securityHeaders({ apiUrl: "https://api.example.com/api/v1" }),
+    );
+    const policy = directives(headers.get("Content-Security-Policy") ?? "");
+
+    expect(policy.get("img-src")).toContain(CLOUDINARY_ASSET_ORIGIN);
+    expect(policy.get("connect-src")).not.toContain(CLOUDINARY_ASSET_ORIGIN);
   });
 
   it("only relaxes script and socket rules in development", () => {
@@ -70,6 +82,8 @@ describe("securityHeaders", () => {
     );
 
     expect(policy.get("connect-src")).toBe("'self'");
-    expect(policy.get("img-src")).toBe("'self' data: blob:");
+    expect(policy.get("img-src")).toBe(
+      `'self' ${CLOUDINARY_ASSET_ORIGIN} data: blob:`,
+    );
   });
 });

@@ -1,8 +1,9 @@
 /**
- * Backend asset URIs are usually file names relative to the backend's asset
- * directory (for example `fake-8b9a.png`), not browser URLs. Absolute web
- * URIs keep working; everything else goes through the same-origin asset proxy,
- * which serves the configured backend asset directory.
+ * Backend asset URIs come in two shapes. Hosted deployments return Cloudinary
+ * HTTPS URLs, which the browser loads directly. Local deployments return file
+ * names relative to the backend's asset directory (for example `fake-8b9a.png`),
+ * which go through the same-origin asset proxy. Absolute web and inline URIs
+ * keep working unchanged.
  */
 const ABSOLUTE_URI = /^(?:https?:|data:|blob:|\/\/)/i;
 

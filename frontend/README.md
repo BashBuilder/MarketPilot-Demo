@@ -24,14 +24,19 @@ On PowerShell use `Copy-Item .env.example .env.local`. Set
 `http://localhost:8000/api/v1`. Only `NEXT_PUBLIC_*` values reach the browser;
 never put secrets in them.
 
-The backend returns generated images as paths relative to its asset directory,
-not as HTTP URLs. Set the server-only `BACKEND_ASSET_DIR` to that directory so
-the same-origin `/api/assets` proxy can display previews. Use a shared volume in
-Docker, or point it at the backend checkout during local development:
+Generated images arrive in one of two forms. With the backend's hosted storage
+(`ASSET_STORAGE=cloudinary`), assets are public `https://res.cloudinary.com`
+URLs and load directly; the CSP allows that origin. With local storage, the
+backend returns paths relative to its asset directory, so set the server-only
+`BACKEND_ASSET_DIR` to that directory and the same-origin `/api/assets` proxy
+can display previews. Use a shared volume in Docker, or point it at the backend
+checkout during local development:
 
 ```bash
 BACKEND_ASSET_DIR=../MarketPilot-Backend/backend/assets
 ```
+
+Cloudinary-hosted deployments do not need `BACKEND_ASSET_DIR`.
 
 ## Scripts
 
