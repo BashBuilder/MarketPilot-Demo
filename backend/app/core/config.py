@@ -31,6 +31,8 @@ class Settings(BaseSettings):
 
     deepseek_api_key: SecretStr
     deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_timeout_seconds: float = Field(default=120.0, gt=0)
+    deepseek_max_retries: int = Field(default=2, ge=0)
     database_url: str
     redis_url: str
     event_stream_maxlen: int = Field(default=2000, ge=1)

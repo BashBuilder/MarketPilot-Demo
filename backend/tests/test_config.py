@@ -44,10 +44,14 @@ def test_settings_load_from_environment(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.delenv("RATE_LIMIT_PER_MINUTE", raising=False)
     monkeypatch.delenv("MAX_CONCURRENT_RUNS", raising=False)
     monkeypatch.delenv("TRUST_PROXY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("DEEPSEEK_MAX_RETRIES", raising=False)
 
     settings = Settings(_env_file=None)
 
     assert settings.deepseek_api_key.get_secret_value() == "test-key"
+    assert settings.deepseek_timeout_seconds == 120.0
+    assert settings.deepseek_max_retries == 2
     assert settings.database_url.endswith("/marketpilot")
     assert settings.redis_url == "redis://localhost:6379/0"
     assert settings.event_stream_maxlen == 2000
@@ -76,6 +80,16 @@ def test_settings_load_from_environment(monkeypatch: pytest.MonkeyPatch) -> None
     assert settings.rate_limit_per_minute == 20
     assert settings.max_concurrent_runs == 3
     assert settings.trust_proxy is False
+
+
+def test_settings_reject_negative_deepseek_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/marketpilot")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("DEEPSEEK_MAX_RETRIES", "-1")
+
+    with pytest.raises(ValidationError, match="deepseek_max_retries"):
+        Settings(_env_file=None)
 
 
 def test_settings_reject_zero_retry_attempts(monkeypatch: pytest.MonkeyPatch) -> None:

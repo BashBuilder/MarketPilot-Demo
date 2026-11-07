@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 from typing import Any
 
+import httpx
 import pytest
 
 from app.core.config import Settings
@@ -41,6 +42,29 @@ def _client(result: Any) -> DeepSeekLLMClient:
     client = DeepSeekLLMClient(_settings())
     client._model = _Model(result)  # type: ignore[assignment]
     return client
+
+
+def test_client_enables_transport_retries_and_timeouts() -> None:
+    client = DeepSeekLLMClient(_settings())
+
+    assert client._model.max_retries == 2
+    timeout = client._model.request_timeout
+    assert isinstance(timeout, httpx.Timeout)
+    assert timeout.connect == 10.0
+    assert timeout.read == 120.0
+
+
+def test_client_honours_transport_overrides() -> None:
+    settings = _settings().model_copy(
+        update={"deepseek_max_retries": 0, "deepseek_timeout_seconds": 45.0}
+    )
+
+    client = DeepSeekLLMClient(settings)
+
+    assert client._model.max_retries == 0
+    timeout = client._model.request_timeout
+    assert isinstance(timeout, httpx.Timeout)
+    assert timeout.read == 45.0
 
 
 async def test_invalid_tool_arguments_are_returned_for_verification() -> None:
