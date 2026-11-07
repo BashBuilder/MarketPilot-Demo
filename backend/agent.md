@@ -195,6 +195,8 @@ Dependency direction: `api -> graph -> agents -> tools`; the harness wraps agent
 | --- | --- | --- |
 | `DEEPSEEK_API_KEY` | required | Provider key. |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | OpenAI-compatible endpoint. |
+| `DEEPSEEK_TIMEOUT_SECONDS` | `120` | Per-call deadline; 10s connect timeout. |
+| `DEEPSEEK_MAX_RETRIES` | `2` | SDK transport retries for connect errors, 408/429/5xx. |
 | `DATABASE_URL` | required | `postgresql+asyncpg://...`; append `?ssl=require` for external Postgres. |
 | `REDIS_URL` | required | Event bus and rate-limit counters. |
 | `EVENT_STREAM_MAXLEN` | `2000` | Max events retained per run stream. |

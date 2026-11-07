@@ -1,15 +1,21 @@
 """DeepSeek structured-output client behind the ``LLMClient`` protocol.
 
-The harness owns retries and validation, so this adapter makes exactly one
-request per call. It deliberately returns the raw tool arguments instead of
-letting LangChain validate the payload: a schema miss must reach
+The harness owns validation retries, so this adapter makes exactly one
+structured request per call. It deliberately returns the raw tool arguments
+instead of letting LangChain validate the payload: a schema miss must reach
 ``run_with_verification`` so the validation error becomes retry feedback.
+
+The transport still gets a small retry budget. A transient connect error or
+server disconnect says nothing about the model's answer, so retrying it here
+(handled by the OpenAI SDK, including ``Retry-After``) is cheaper than failing
+the whole run and asking a human to start over.
 """
 
 import json
 from collections.abc import Sequence
 from typing import Any
 
+import httpx
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 
@@ -17,6 +23,7 @@ from app.agents.contracts import ChatMessage
 from app.core.config import Settings
 
 DEFAULT_MODEL = "deepseek-chat"
+CONNECT_TIMEOUT_SECONDS = 10.0
 
 
 class DeepSeekLLMClient:
@@ -30,8 +37,11 @@ class DeepSeekLLMClient:
             api_key=settings.deepseek_api_key,
             base_url=settings.deepseek_base_url,
             temperature=0,
-            timeout=60.0,
-            max_retries=0,
+            timeout=httpx.Timeout(
+                settings.deepseek_timeout_seconds,
+                connect=CONNECT_TIMEOUT_SECONDS,
+            ),
+            max_retries=settings.deepseek_max_retries,
         )
 
     async def structured(
